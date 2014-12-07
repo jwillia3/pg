@@ -12,10 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
-#include "asg.h"
-#include "platform.h"
+#include <ags/ags.h>
+#include <ags/platform.h>
 
-static AsgFontFamily    *Families;
+static AgsFontFamily    *Families;
 static int              NFamilies;
 
 #define MIN(X,Y) ((X) < (Y)? (X): (Y))
@@ -27,7 +27,7 @@ static bool within_int(int a, int b, int c) {
 static int clamp_int(int a, int b, int c) {
     return b <= a? a: b >= c? c: b;
 }
-static float distance(AsgPoint a, AsgPoint b) {
+static float distance(AgsPoint a, AgsPoint b) {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
     return sqrt(dx*dx + dy*dy);
@@ -35,14 +35,14 @@ static float distance(AsgPoint a, AsgPoint b) {
 static float dist(float x, float y) {
     return sqrt(x*x + y*y);
 }
-static AsgPoint mid(AsgPoint a, AsgPoint b) {
-    return asg_pt((a.x + b.x) / 2, (a.y + b.y) / 2);
+static AgsPoint mid(AgsPoint a, AgsPoint b) {
+    return ags_pt((a.x + b.x) / 2, (a.y + b.y) / 2);
 }
 
 static float fraction(float x) {
     return x - floor(x);
 }
-uint32_t asg_blend(uint32_t bg, uint32_t fg, uint32_t a) {
+uint32_t ags_blend(uint32_t bg, uint32_t fg, uint32_t a) {
     if (a == 0xff)
         return fg;
     else if (a == 0)
@@ -56,8 +56,8 @@ uint32_t asg_blend(uint32_t bg, uint32_t fg, uint32_t a) {
                     0x00ff0000;
     return (rb | g) >> 8;
 }
-Asg *asg_new(void *buf, int width, int height) {
-    Asg *gs = malloc(sizeof *gs);
+Ags *ags_new(void *buf, int width, int height) {
+    Ags *gs = malloc(sizeof *gs);
     gs->width = width;
     gs->height = height;
     if (buf)
@@ -66,16 +66,16 @@ Asg *asg_new(void *buf, int width, int height) {
         gs->buf = malloc(width * height * sizeof *gs->buf);
     gs->flatness = 1.001f;
     gs->subsamples = 3;
-    asg_load_identity(gs);
+    ags_load_identity(gs);
     return gs;
 }
-void asg_free(Asg *gs) {
+void ags_free(Ags *gs) {
     if (gs) {
         free(gs->buf);
         free(gs);
     }
 }
-void asg_matrix_identity(AsgMatrix *mat) {
+void ags_matrix_identity(AgsMatrix *mat) {
     mat->a = 1;
     mat->b = 0;
     mat->c = 0;
@@ -83,11 +83,11 @@ void asg_matrix_identity(AsgMatrix *mat) {
     mat->e = 0;
     mat->f = 0;
 }
-void asg_matrix_translate(AsgMatrix *mat, float x, float y) {
+void ags_matrix_translate(AgsMatrix *mat, float x, float y) {
     mat->e += x;
     mat->f += y;
 }
-void asg_matrix_scale(AsgMatrix *mat, float x, float y) {
+void ags_matrix_scale(AgsMatrix *mat, float x, float y) {
     mat->a *= x;
     mat->c *= x;
     mat->e *= x;
@@ -95,7 +95,7 @@ void asg_matrix_scale(AsgMatrix *mat, float x, float y) {
     mat->d *= y;
     mat->f *= y;
 }
-void asg_matrix_shear(AsgMatrix *mat, float x, float y) {
+void ags_matrix_shear(AgsMatrix *mat, float x, float y) {
     mat->a = mat->a + mat->b * y;
     mat->c = mat->c + mat->d * y;
     mat->e = mat->e + mat->f * y;
@@ -103,8 +103,8 @@ void asg_matrix_shear(AsgMatrix *mat, float x, float y) {
     mat->d = mat->c * x + mat->d;
     mat->f = mat->e * x + mat->f;
 }
-void asg_matrix_rotate(AsgMatrix *mat, float rad) {
-    AsgMatrix old = *mat;
+void ags_matrix_rotate(AgsMatrix *mat, float rad) {
+    AgsMatrix old = *mat;
     float m = cos(rad);
     float n = sin(rad);
     mat->a = old.a * m - old.b * n;
@@ -114,8 +114,8 @@ void asg_matrix_rotate(AsgMatrix *mat, float rad) {
     mat->e = old.e * m - old.f * n;
     mat->f = old.e * n + old.f * m;
 }
-void asg_matrix_multiply(AsgMatrix * __restrict a, const AsgMatrix * __restrict b) {
-    AsgMatrix old = *a;
+void ags_matrix_multiply(AgsMatrix * __restrict a, const AgsMatrix * __restrict b) {
+    AgsMatrix old = *a;
     
     a->a = old.a * b->a + old.b * b->c;
     a->c = old.c * b->a + old.d * b->c;
@@ -125,43 +125,43 @@ void asg_matrix_multiply(AsgMatrix * __restrict a, const AsgMatrix * __restrict 
     a->d = old.c * b->b + old.d * b->d;
     a->f = old.e * b->b + old.f * b->d + b->f;
 }
-void asg_load_identity(Asg *gs) {
-    asg_matrix_identity(&gs->ctm);
+void ags_load_identity(Ags *gs) {
+    ags_matrix_identity(&gs->ctm);
 }
-void asg_translate(Asg *gs, float x, float y) {
-    asg_matrix_translate(&gs->ctm, x, y);
+void ags_translate(Ags *gs, float x, float y) {
+    ags_matrix_translate(&gs->ctm, x, y);
 }
-void asg_scale(Asg *gs, float x, float y) {
-    asg_matrix_scale(&gs->ctm, x, y);
+void ags_scale(Ags *gs, float x, float y) {
+    ags_matrix_scale(&gs->ctm, x, y);
 }
-void asg_shear(Asg *gs, float x, float y) {
-    asg_matrix_shear(&gs->ctm, x, y);
+void ags_shear(Ags *gs, float x, float y) {
+    ags_matrix_shear(&gs->ctm, x, y);
 }
-void asg_rotate(Asg *gs, float rad) {
-    asg_matrix_rotate(&gs->ctm, rad);
+void ags_rotate(Ags *gs, float rad) {
+    ags_matrix_rotate(&gs->ctm, rad);
 }
-void asg_multiply_matrix(Asg *asg, const AsgMatrix * __restrict mat) {
-    asg_matrix_multiply(&asg->ctm, mat);
+void ags_multiply_matrix(Ags *gs, const AgsMatrix * __restrict mat) {
+    ags_matrix_multiply(&gs->ctm, mat);
 }
-AsgPoint asg_transform_point(const AsgMatrix *ctm, AsgPoint p) {
-    AsgPoint out = {
+AgsPoint ags_transform_point(const AgsMatrix *ctm, AgsPoint p) {
+    AgsPoint out = {
         ctm->a * p.x + ctm->c * p.y + ctm->e,
         ctm->b * p.x + ctm->d * p.y + ctm->f
     };
     return out;
 }
-void asg_clear(
-    const Asg *gs,
+void ags_clear(
+    const Ags *gs,
     uint32_t color)
 {
     uint32_t *p = gs->buf;
     uint32_t *end = gs->buf + gs->width * gs->height;
     while (p < end) *p++ = color;
 }
-void asg_stroke_line(
-    const Asg *gs,
-    AsgPoint a,
-    AsgPoint b,
+void ags_stroke_line(
+    const Ags *gs,
+    AgsPoint a,
+    AgsPoint b,
     uint32_t color)
 {
    int x0 = a.x;
@@ -177,14 +177,14 @@ void asg_stroke_line(
    uint32_t *scr = gs->buf + y0 * gs->width + x0;
    for ( ; ; ) {                                         /* pixel loop */
       if (within_int(0, x0, gs->width) && within_int(0, y0, gs->height))
-        *scr = asg_blend(color, *scr, 255*abs(err-dx+dy)/ed);
+        *scr = ags_blend(color, *scr, 255*abs(err-dx+dy)/ed);
       e2 = err; x2 = x0;
       if (2*e2 >= -dx) {                                    /* x step */
          if (x0 == x1) break;
          if (e2+dy < ed)
             if (within_int(0, x0, gs->width) && within_int(0, y0+sy, gs->height)) {
                 uint32_t *tmp = scr + (sy > 0? gs->width: -gs->width);
-                *tmp = asg_blend(color, *tmp, 255*(e2+dy)/ed);
+                *tmp = ags_blend(color, *tmp, 255*(e2+dy)/ed);
             }
          err -= dy; x0 += sx;
          scr += sx;
@@ -194,17 +194,17 @@ void asg_stroke_line(
          if (dx-e2 < ed)
             if (within_int(0, x2+sx, gs->width) && within_int(0, y0, gs->height)) {
                 uint32_t *tmp = scr + (x2 - x0) + sx;
-                *tmp = asg_blend(color, *tmp, 255*(dx-e2)/ed);
+                *tmp = ags_blend(color, *tmp, 255*(dx-e2)/ed);
             }
          err += dx; y0 += sy; 
          scr += sy > 0? gs->width: -gs->width;
       }
     }
 }
-void asg_stroke_rectangle(
-    const Asg *gs,
-    AsgPoint nw,
-    AsgPoint se,
+void ags_stroke_rectangle(
+    const Ags *gs,
+    AgsPoint nw,
+    AgsPoint se,
     uint32_t color)
 {
     int x0 = clamp_int(0, nw.x, gs->width - 1);
@@ -217,38 +217,38 @@ void asg_stroke_rectangle(
     
     if (within_int(0, nw.y, gs->height))
         for (int x = x0; x <= x1; x++)
-            screen[x] = asg_blend(screen[x], color, a * (1 - fraction(nw.y)));
+            screen[x] = ags_blend(screen[x], color, a * (1 - fraction(nw.y)));
     screen += gs->width;
     if (within_int(0, nw.y + 1, gs->height))
         for (int x = x0; x <= x1; x++)
-            screen[x] = asg_blend(screen[x], color, a * fraction(nw.y));
+            screen[x] = ags_blend(screen[x], color, a * fraction(nw.y));
     
     
     for (int y = y0; y <= y1; y++, screen += gs->width) {
         if (within_int(0, nw.x, gs->width))
-            screen[x0] = asg_blend(screen[x0], color, a * (1 - fraction(nw.x)));
+            screen[x0] = ags_blend(screen[x0], color, a * (1 - fraction(nw.x)));
         if (within_int(0, nw.x+1, gs->width))
-            screen[x0+1] = asg_blend(screen[x0+1], color, a * fraction(nw.x));
+            screen[x0+1] = ags_blend(screen[x0+1], color, a * fraction(nw.x));
         if (within_int(0, se.x, gs->width))
-            screen[x1] = asg_blend(screen[x1], color, a * (1 - fraction(se.x)));
+            screen[x1] = ags_blend(screen[x1], color, a * (1 - fraction(se.x)));
         if (within_int(0, se.x-1, gs->width))
-            screen[x1-1] = asg_blend(screen[x1-1], color, a * fraction(se.x));
+            screen[x1-1] = ags_blend(screen[x1-1], color, a * fraction(se.x));
     }
     
     screen -= gs->width;
     if (within_int(0, se.y, gs->height))
         for (int x = x0; x <= x1; x++)
-            screen[x] = asg_blend(screen[x], color, a * (1 - fraction(se.y)));
+            screen[x] = ags_blend(screen[x], color, a * (1 - fraction(se.y)));
     screen += gs->width;
     if (within_int(0, se.y + 1, gs->height))
         for (int x = x0; x <= x1; x++)
-            screen[x] = asg_blend(screen[x], color, a * fraction(se.y));
+            screen[x] = ags_blend(screen[x], color, a * fraction(se.y));
 }
 
-void asg_fill_rectangle(
-    const Asg *gs,
-    AsgPoint nw,
-    AsgPoint se,
+void ags_fill_rectangle(
+    const Ags *gs,
+    AgsPoint nw,
+    AgsPoint se,
     uint32_t color)
 {
     int x0 = clamp_int(0, nw.x, gs->width - 1);
@@ -261,24 +261,24 @@ void asg_fill_rectangle(
     
     if (within_int(0, nw.y, gs->height))
         for (int x = x0; x <= x1; x++)
-            screen[x] = asg_blend(screen[x], color, a * (1 - fraction(nw.y)));
+            screen[x] = ags_blend(screen[x], color, a * (1 - fraction(nw.y)));
     screen += gs->width;
     for (int y = y0; y < y1; y++, screen += gs->width) {
         if (within_int(0, nw.x, gs->width))
-            screen[x0] = asg_blend(screen[x0], color, a * (1 - fraction(nw.x)));
+            screen[x0] = ags_blend(screen[x0], color, a * (1 - fraction(nw.x)));
         for (int x = x0 + 1; x < x1; x++)
-            screen[x] = asg_blend(screen[x], color, a);
+            screen[x] = ags_blend(screen[x], color, a);
         if (within_int(0, se.x-1, gs->width))
-            screen[x1-1] = asg_blend(screen[x1-1], color, a * fraction(se.x));
+            screen[x1-1] = ags_blend(screen[x1-1], color, a * fraction(se.x));
     }
     if (within_int(0, se.y, gs->height))
         for (int x = x0; x <= x1; x++)
-            screen[x] = asg_blend(screen[x], color, a * fraction(se.y));
+            screen[x] = ags_blend(screen[x], color, a * fraction(se.y));
 }
 
-void asg_stroke_circle(
-    const Asg *gs,
-    AsgPoint centre,
+void ags_stroke_circle(
+    const Ags *gs,
+    AgsPoint centre,
     float radius,
     uint32_t color)
 {
@@ -306,9 +306,9 @@ void asg_stroke_circle(
         }
     } while (x < 0);
 }
-void asg_fill_circle(
-    const Asg *gs,
-    AsgPoint centre,
+void ags_fill_circle(
+    const Ags *gs,
+    AgsPoint centre,
     float radius,
     uint32_t color)
 {
@@ -330,16 +330,16 @@ void asg_fill_circle(
             if (d < radius)
                 if (within_int(0,x,gs->width) && within_int(0,y,gs->height)) {
                     if (!first) {
-                        screen[x] = asg_blend(screen[x],
+                        screen[x] = ags_blend(screen[x],
                             color,
                             (color >> 24) * (1 - fraction(centre.x - radius)));
                         first = true;
                     } else
-                        screen[x] = asg_blend(screen[x], color, color >> 24);
+                        screen[x] = ags_blend(screen[x], color, color >> 24);
                 }
         }
         if (max_x == centre.x + radius)
-            screen[max_x] = asg_blend(screen[max_x],
+            screen[max_x] = ags_blend(screen[max_x],
                 color,
                 (color >> 24) * fraction(centre.x + radius));
         screen += gs->width;
@@ -347,47 +347,47 @@ void asg_fill_circle(
 }
 
 static void stroke_bezier3(
-    const Asg *gs,
-    AsgPoint a,
-    AsgPoint b,
-    AsgPoint c,
+    const Ags *gs,
+    AgsPoint a,
+    AgsPoint b,
+    AgsPoint c,
     uint32_t color,
     int n)
 {
     // TODO Make quadratic and cubic agree on what flatness is
     if (!n) {
-        asg_stroke_line(gs, a, c, color);
+        ags_stroke_line(gs, a, c, color);
         return;
     }
-    AsgPoint m = { (a.x + 2 * b.x + c.x) / 4, (a.y + 2 * b.y + c.y) / 4 };
-    AsgPoint d = { (a.x + c.x) / 2 - m.x, (a.y + c.y) / 2 - m.y };
+    AgsPoint m = { (a.x + 2 * b.x + c.x) / 4, (a.y + 2 * b.y + c.y) / 4 };
+    AgsPoint d = { (a.x + c.x) / 2 - m.x, (a.y + c.y) / 2 - m.y };
     if (d.x * d.x + d.y * d.y > .05) {
-        stroke_bezier3(gs, a, asg_pt((a.x + b.x) / 2, (a.y + b.y) / 2), m, color, n - 1);
-        stroke_bezier3(gs, m, asg_pt((b.x + c.x) / 2, (b.y + c.y) / 2), c, color, n - 1);
+        stroke_bezier3(gs, a, ags_pt((a.x + b.x) / 2, (a.y + b.y) / 2), m, color, n - 1);
+        stroke_bezier3(gs, m, ags_pt((b.x + c.x) / 2, (b.y + c.y) / 2), c, color, n - 1);
     } else
-        asg_stroke_line(gs, a, c, color);
+        ags_stroke_line(gs, a, c, color);
 }
 
-void asg_stroke_bezier3(
-    const Asg *gs,
-    AsgPoint a,
-    AsgPoint b,
-    AsgPoint c,
+void ags_stroke_bezier3(
+    const Ags *gs,
+    AgsPoint a,
+    AgsPoint b,
+    AgsPoint c,
     uint32_t color)
 {
     stroke_bezier3(gs, a, b, c, color, BEZIER_RECURSION_LIMIT);
 }
 static void stroke_bezier4(
-    const Asg *gs,
-    AsgPoint a,
-    AsgPoint b,
-    AsgPoint c,
-    AsgPoint d,
+    const Ags *gs,
+    AgsPoint a,
+    AgsPoint b,
+    AgsPoint c,
+    AgsPoint d,
     uint32_t color,
     int n)
 {
     if (!n) {
-        asg_stroke_line(gs, a, d, color);
+        ags_stroke_line(gs, a, d, color);
         return;
     }
     float d1 = dist(a.x - b.x, a.y - b.y);
@@ -395,35 +395,35 @@ static void stroke_bezier4(
     float d3 = dist(c.x - d.x, c.y - d.y);
     float d4 = dist(a.x - d.x, a.y - d.y);
     if (d1 + d2 + d3 < gs->flatness * d4)
-        asg_stroke_line(gs, a, d, color);
+        ags_stroke_line(gs, a, d, color);
     else {
-        AsgPoint mab = mid(a, b);
-        AsgPoint mbc = mid(b, c);
-        AsgPoint mcd = mid(c, d);
-        AsgPoint mabc = mid(mab, mbc);
-        AsgPoint mbcd = mid(mbc, mcd);
-        AsgPoint mabcd = mid(mabc, mbcd);
+        AgsPoint mab = mid(a, b);
+        AgsPoint mbc = mid(b, c);
+        AgsPoint mcd = mid(c, d);
+        AgsPoint mabc = mid(mab, mbc);
+        AgsPoint mbcd = mid(mbc, mcd);
+        AgsPoint mabcd = mid(mabc, mbcd);
         stroke_bezier4(gs, a, mab, mabc, mabcd, color, n - 1);
         stroke_bezier4(gs, mabcd, mbcd, mcd, d, color, n - 1);
     }
 }
-void asg_stroke_bezier4(
-    const Asg *gs,
-    AsgPoint a,
-    AsgPoint b,
-    AsgPoint c,
-    AsgPoint d,
+void ags_stroke_bezier4(
+    const Ags *gs,
+    AgsPoint a,
+    AgsPoint b,
+    AgsPoint c,
+    AgsPoint d,
     uint32_t color)
 {
     stroke_bezier4(gs, a, b, c, d, color, BEZIER_RECURSION_LIMIT);
 }
 
-AsgPath *asg_new_path(void) {
-    AsgPath *path = calloc(1, sizeof *path);
+AgsPath *ags_new_path(void) {
+    AgsPath *path = calloc(1, sizeof *path);
     return path;
 }
 
-void asg_free_path(AsgPath *path) {
+void ags_free_path(AgsPath *path) {
     if (path) {
         free(path->types);
         free(path->points);
@@ -432,9 +432,9 @@ void asg_free_path(AsgPath *path) {
 }
 
 static void add_part(
-    AsgPath *path,
-    const AsgMatrix *ctm,
-    AsgPathPartType type,
+    AgsPath *path,
+    const AgsMatrix *ctm,
+    AgsPathPartType type,
     ...)
 {
     if (path->nparts + 1 >= path->cap) {
@@ -446,78 +446,78 @@ static void add_part(
     va_list ap;
     va_start(ap, type);
     path->types[path->nparts] = type;
-    for (int i = 0; i < asg_path_part_type_args(type); i++)
-        path->points[path->npoints + i] = asg_transform_point(ctm, *va_arg(ap, AsgPoint*));
+    for (int i = 0; i < ags_path_part_type_args(type); i++)
+        path->points[path->npoints + i] = ags_transform_point(ctm, *va_arg(ap, AgsPoint*));
     va_end(ap);
     path->nparts++;
-    path->npoints += asg_path_part_type_args(type);
+    path->npoints += ags_path_part_type_args(type);
 }
 
-void asg_add_subpath(
-    AsgPath *path,
-    const AsgMatrix *ctm,
-    AsgPoint p)
+void ags_add_subpath(
+    AgsPath *path,
+    const AgsMatrix *ctm,
+    AgsPoint p)
 {
-    path->start = asg_transform_point(ctm, p);
-    add_part(path, ctm, ASG_PATH_SUBPATH, &p);
+    path->start = ags_transform_point(ctm, p);
+    add_part(path, ctm, AGS_PATH_SUBPATH, &p);
 }
 
-void asg_close_subpath(AsgPath *path) {
-    add_part(path, &AsgIdentityMatrix, ASG_PATH_LINE, &path->start);
+void ags_close_subpath(AgsPath *path) {
+    add_part(path, &AgsIdentityMatrix, AGS_PATH_LINE, &path->start);
 }
-void asg_add_line(
-    AsgPath *path,
-    const AsgMatrix *ctm,
-    AsgPoint b)
+void ags_add_line(
+    AgsPath *path,
+    const AgsMatrix *ctm,
+    AgsPoint b)
 {
-    add_part(path, ctm, ASG_PATH_LINE, &b);
+    add_part(path, ctm, AGS_PATH_LINE, &b);
 }
-void asg_add_bezier3(
-    AsgPath *path,
-    const AsgMatrix *ctm,
-    AsgPoint b,
-    AsgPoint c)
+void ags_add_bezier3(
+    AgsPath *path,
+    const AgsMatrix *ctm,
+    AgsPoint b,
+    AgsPoint c)
 {
-    add_part(path, ctm, ASG_PATH_BEZIER3, &b, &c);
+    add_part(path, ctm, AGS_PATH_BEZIER3, &b, &c);
 }
-void asg_add_bezier4(
-    AsgPath *path,
-    const AsgMatrix *ctm,
-    AsgPoint b,
-    AsgPoint c,
-    AsgPoint d)
+void ags_add_bezier4(
+    AgsPath *path,
+    const AgsMatrix *ctm,
+    AgsPoint b,
+    AgsPoint c,
+    AgsPoint d)
 {
-    add_part(path, ctm, ASG_PATH_BEZIER4, &b, &c, &d);
+    add_part(path, ctm, AGS_PATH_BEZIER4, &b, &c, &d);
 }
 
-void asg_stroke_path(
-    const Asg *gs,
-    const AsgPath *path,
+void ags_stroke_path(
+    const Ags *gs,
+    const AgsPath *path,
     uint32_t color)
 {    
-    AsgPoint a = {0, 0};
-    for (int i = 0, ip = 0; i < path->nparts; ip += asg_path_part_type_args(path->types[i]), i++)
+    AgsPoint a = {0, 0};
+    for (int i = 0, ip = 0; i < path->nparts; ip += ags_path_part_type_args(path->types[i]), i++)
         switch (path->types[i]) {
-        case ASG_PATH_SUBPATH:
+        case AGS_PATH_SUBPATH:
             a = path->points[ip];
             break;
-        case ASG_PATH_LINE:
-            asg_stroke_line(gs, a, path->points[ip], color);
+        case AGS_PATH_LINE:
+            ags_stroke_line(gs, a, path->points[ip], color);
             a = path->points[ip];
             break;
-        case ASG_PATH_BEZIER3:
-            asg_stroke_bezier3(gs, a, path->points[ip], path->points[ip+1], color);
+        case AGS_PATH_BEZIER3:
+            ags_stroke_bezier3(gs, a, path->points[ip], path->points[ip+1], color);
             a = path->points[ip+1];
             break;
-        case ASG_PATH_BEZIER4:
-            asg_stroke_bezier4(gs, a, path->points[ip], path->points[ip+1], path->points[ip+2], color);
+        case AGS_PATH_BEZIER4:
+            ags_stroke_bezier4(gs, a, path->points[ip], path->points[ip+1], path->points[ip+2], color);
             a = path->points[ip+2];
             break;
         }
 }
 
-AsgRect asg_get_bounding_box(AsgPath *path) {
-    AsgRect r = { {FLT_MAX,FLT_MAX}, {FLT_MIN,FLT_MIN} };
+AgsRect ags_get_bounding_box(AgsPath *path) {
+    AgsRect r = { {FLT_MAX,FLT_MAX}, {FLT_MIN,FLT_MIN} };
     // TODO box is not tight since it just goes by curve control points
     for (int i = 0; i < path->npoints; i++) {
         r.a.x = MIN(r.a.x, path->points[i].x);
@@ -529,8 +529,8 @@ AsgRect asg_get_bounding_box(AsgPath *path) {
 }
 
 typedef struct {
-    AsgPoint    a;
-    AsgPoint    b;
+    AgsPoint    a;
+    AgsPoint    b;
     float       m;
     float       dir;
 } Segment;
@@ -543,8 +543,8 @@ typedef struct {
 
 static void add_seg(
     SegList *list,
-    AsgPoint a,
-    AsgPoint b)
+    AgsPoint a,
+    AgsPoint b)
 {
     if (list->n + 1 >= list->cap) {
         list->cap = list->cap? list->cap * 2: 128;
@@ -557,9 +557,9 @@ static void add_seg(
 }
 static void decomp_bezier3(
     SegList *list,
-    AsgPoint a,
-    AsgPoint b,
-    AsgPoint c,
+    AgsPoint a,
+    AgsPoint b,
+    AgsPoint c,
     float flatness,
     int n)
 {    
@@ -567,20 +567,20 @@ static void decomp_bezier3(
         add_seg(list, a, c);
         return;
     }
-    AsgPoint m = { (a.x + 2 * b.x + c.x) / 4, (a.y + 2 * b.y + c.y) / 4 };
-    AsgPoint d = { (a.x + c.x) / 2 - m.x, (a.y + c.y) / 2 - m.y };
+    AgsPoint m = { (a.x + 2 * b.x + c.x) / 4, (a.y + 2 * b.y + c.y) / 4 };
+    AgsPoint d = { (a.x + c.x) / 2 - m.x, (a.y + c.y) / 2 - m.y };
     if (d.x * d.x + d.y * d.y > .05) {
-        decomp_bezier3(list, a, asg_pt((a.x + b.x) / 2, (a.y + b.y) / 2), m, flatness, n - 1);
-        decomp_bezier3(list, m, asg_pt((b.x + c.x) / 2, (b.y + c.y) / 2), c, flatness, n - 1);
+        decomp_bezier3(list, a, ags_pt((a.x + b.x) / 2, (a.y + b.y) / 2), m, flatness, n - 1);
+        decomp_bezier3(list, m, ags_pt((b.x + c.x) / 2, (b.y + c.y) / 2), c, flatness, n - 1);
     } else
         add_seg(list, a, c);
 }
 static void decomp_bezier4(
     SegList *list,
-    AsgPoint a,
-    AsgPoint b,
-    AsgPoint c,
-    AsgPoint d,
+    AgsPoint a,
+    AgsPoint b,
+    AgsPoint c,
+    AgsPoint d,
     float flatness,
     int n)
 {    
@@ -593,12 +593,12 @@ static void decomp_bezier4(
     float d3 = dist(c.x - d.x, c.y - d.y);
     float d4 = dist(a.x - d.x, a.y - d.y);
     if (d1 + d2 + d3 >= flatness * d4) {
-        AsgPoint mab = mid(a, b);
-        AsgPoint mbc = mid(b, c);
-        AsgPoint mcd = mid(c, d);
-        AsgPoint mabc = mid(mab, mbc);
-        AsgPoint mbcd = mid(mbc, mcd);
-        AsgPoint mabcd = mid(mabc, mbcd);
+        AgsPoint mab = mid(a, b);
+        AgsPoint mbc = mid(b, c);
+        AgsPoint mcd = mid(c, d);
+        AgsPoint mabc = mid(mab, mbc);
+        AgsPoint mbcd = mid(mbc, mcd);
+        AgsPoint mabcd = mid(mabc, mbcd);
         decomp_bezier4(list, a, mab, mabc, mabcd, flatness, n - 1);
         decomp_bezier4(list, mabcd, mbcd, mcd, d, flatness, n - 1);
     } else
@@ -613,7 +613,7 @@ static int sort_tops(const void *ap, const void *bp) {
             a->a.x > b->a.x? 1:
             0;
 }
-static void fill_evenodd(const Asg *gs, const Segment *segs, int nsegs, uint32_t color) {
+static void fill_evenodd(const Ags *gs, const Segment *segs, int nsegs, uint32_t color) {
     typedef struct {
         float y0;
         float y1;
@@ -742,20 +742,20 @@ static void fill_evenodd(const Asg *gs, const Segment *segs, int nsegs, uint32_t
         } else {
             uint32_t * __restrict   screen = gs->buf + scan_y * gs->width;
             for (int i = min_x; i <= max_x; i++)
-                if (buffer[i]) screen[i] = asg_blend(screen[i], color, buffer[i]);
+                if (buffer[i]) screen[i] = ags_blend(screen[i], color, buffer[i]);
         }
     }
     free(buffer);
     free(edges);
 }
-static void fill_nonzero(const Asg *gs, const Segment *segs, int nsegs, uint32_t color) {
+static void fill_nonzero(const Ags *gs, const Segment *segs, int nsegs, uint32_t color) {
     // TODO Do even-odd fill rule
     fill_evenodd(gs, segs, nsegs, color);
 }
 
-void asg_fill_path(
-    const Asg *gs,
-    const AsgPath *path,
+void ags_fill_path(
+    const Ags *gs,
+    const AgsPath *path,
     uint32_t color)
 {
     if (path->nparts == 0) return;
@@ -763,21 +763,21 @@ void asg_fill_path(
     SegList list = { 0 };
     
     // Decompose curves into a list of lines
-    AsgPoint a = {0, 0};
-    for (int i = 0, ip = 0; i < path->nparts; ip += asg_path_part_type_args(path->types[i]), i++)
+    AgsPoint a = {0, 0};
+    for (int i = 0, ip = 0; i < path->nparts; ip += ags_path_part_type_args(path->types[i]), i++)
         switch (path->types[i]) {
-        case ASG_PATH_SUBPATH:
+        case AGS_PATH_SUBPATH:
             a = path->points[ip];
             break;
-        case ASG_PATH_LINE:
+        case AGS_PATH_LINE:
             add_seg(&list, a, path->points[ip]);
             a = path->points[ip];
             break;
-        case ASG_PATH_BEZIER3:
+        case AGS_PATH_BEZIER3:
             decomp_bezier3(&list, a, path->points[ip], path->points[ip+1], gs->flatness, BEZIER_RECURSION_LIMIT);
             a = path->points[ip+1];
             break;
-        case ASG_PATH_BEZIER4:
+        case AGS_PATH_BEZIER4:
             decomp_bezier4(&list, a, path->points[ip], path->points[ip+1], path->points[ip+2], gs->flatness, BEZIER_RECURSION_LIMIT);
             a = path->points[ip+2];
             break;
@@ -797,7 +797,7 @@ void asg_fill_path(
     const int nsegs = list.n;
     qsort(list.segs, nsegs, sizeof *segs, sort_tops);
     
-    if (path->fill_rule == ASG_EVENODD_WINDING)
+    if (path->fill_rule == AGS_EVENODD_WINDING)
         fill_evenodd(gs, segs, nsegs, color);
     else
         fill_nonzero(gs, segs, nsegs, color);
@@ -831,7 +831,7 @@ static void unpack(const void **datap, const char *fmt, ...) {
 
 #define trailing(n) ((input[n] & 0xC0) == 0x80)
 #define overlong(n) do { if (o[-1] < n) o[-1] = 0xfffd; } while(0)
-uint16_t *asg_utf8_to_utf16(const uint8_t *input, int len, int *lenp) {
+uint16_t *ags_utf8_to_utf16(const uint8_t *input, int len, int *lenp) {
     if (len < 0) len = strlen(input);
     uint16_t *output = malloc((len + 1) * sizeof *output);
     uint16_t *o = output;
@@ -863,7 +863,7 @@ uint16_t *asg_utf8_to_utf16(const uint8_t *input, int len, int *lenp) {
     if (lenp) *lenp = len;
     return realloc(output, (len + 1) * sizeof *output);
 }
-uint8_t *asg_utf16_to_utf8(const uint16_t *input, int len, int *lenp) {
+uint8_t *ags_utf16_to_utf8(const uint16_t *input, int len, int *lenp) {
     if (len < 0) len = wcslen(input);
     uint8_t *o, *output = malloc(len * 3 + 1);
     for (o = output; len-->0; input++) {
@@ -888,12 +888,12 @@ uint8_t *asg_utf16_to_utf8(const uint16_t *input, int len, int *lenp) {
 static void scan_fonts_per_file(const wchar_t *filename, void *data) {
     int nfonts = 1;
     for (int index = 0; index < nfonts; index++) {
-        AsgFont *font = asg_load_font(data, index, true);
-        nfonts = asg_get_font_font_count(font);
+        AgsFont *font = ags_load_font(data, index, true);
+        nfonts = ags_get_font_font_count(font);
         if (!font) continue;
         
         
-        const wchar_t *family = asg_get_font_family(font);
+        const wchar_t *family = ags_get_font_family(font);
         int i, dir;
         
         for (i = 0; i < NFamilies; i++) {
@@ -912,26 +912,26 @@ static void scan_fonts_per_file(const wchar_t *filename, void *data) {
             NFamilies++;
         }
         
-        int weight = asg_get_font_weight(font) / 100;
+        int weight = ags_get_font_weight(font) / 100;
         if (weight >= 0 && weight < 10) {
-            const wchar_t **slot = asg_is_font_italic(font)
+            const wchar_t **slot = ags_is_font_italic(font)
                 ? &Families[i].italic[weight]
                 : &Families[i].roman[weight];
             
             if (*slot)
                 free((void*)*slot);
             *slot = wcsdup(filename);
-            if (asg_is_font_italic(font))
+            if (ags_is_font_italic(font))
                 Families[i].italic_index[weight] = index;
             else
                 Families[i].roman_index[weight] = index;
         }
 
-        asg_free_font(font);
+        ags_free_font(font);
     }
 }
 
-void asg_free_font_family(AsgFontFamily *family) {
+void ags_free_font_family(AgsFontFamily *family) {
     if (family) {
         free((void*)family->name);
         for (int i = 0; i < 10; i++) {
@@ -940,8 +940,8 @@ void asg_free_font_family(AsgFontFamily *family) {
         }
     }
 }
-static AsgFontFamily copy_font_family(AsgFontFamily *src) {
-    AsgFontFamily out;
+static AgsFontFamily copy_font_family(AgsFontFamily *src) {
+    AgsFontFamily out;
     
     out.name = wcsdup(src->name);
     for (int i = 0; i < 10; i++) {
@@ -953,15 +953,15 @@ static AsgFontFamily copy_font_family(AsgFontFamily *src) {
     return out;
 }
 
-AsgFontFamily *asg_scan_fonts(const wchar_t *dir, int *countp) {
+AgsFontFamily *ags_scan_fonts(const wchar_t *dir, int *countp) {
 //    for (int i = 0; i < NFamilies; i++)
-//        asg_free_font_family(&Families[i]);
+//        ags_free_font_family(&Families[i]);
     Families = NULL;
     NFamilies = 0;
-    platform_scan_directory(dir, scan_fonts_per_file);
+    ags_platform_scan_directory(dir, scan_fonts_per_file);
     
     // Copy families
-    AsgFontFamily *families = malloc(NFamilies * sizeof *families);
+    AgsFontFamily *families = malloc(NFamilies * sizeof *families);
     for (int i = 0; i < NFamilies; i++) 
         families[i] = copy_font_family(&Families[i]);
     
@@ -969,7 +969,7 @@ AsgFontFamily *asg_scan_fonts(const wchar_t *dir, int *countp) {
     return families;
 }
 
-AsgOTF *asg_load_otf(const void *file, int font_index, bool scan_only) {
+AgsOTF *ags_load_otf(const void *file, int font_index, bool scan_only) {
 
     uint32_t nfonts = 1;
     const void *head = NULL;
@@ -1024,7 +1024,7 @@ collection_item:
         }
     }
     
-    AsgOTF *font = calloc(1, sizeof *font);
+    AgsOTF *font = calloc(1, sizeof *font);
     font->hmtx = hmtx;
     font->glyf = glyf;
     font->loca = loca;
@@ -1071,8 +1071,8 @@ collection_item:
             : (font->em - (font->ascender - font->descender)) + font->em * .1f;
         font->x_height = x_height;
         font->cap_height = cap_height;
-        font->subscript_box = asg_rect(asg_pt(subx,suby), asg_pt(subx+subsx, suby+subsy));
-        font->superscript_box = asg_rect(asg_pt(supx,supy), asg_pt(supx+supsx, supy+supsy));
+        font->subscript_box = ags_rect(ags_pt(subx,suby), ags_pt(subx+subsx, suby+subsy));
+        font->superscript_box = ags_rect(ags_pt(supx,supy), ags_pt(supx+supsx, supy+supsy));
         font->weight = weight;
         font->stretch = stretch;
         font->is_italic = style & 0x101; // includes italics and oblique
@@ -1201,11 +1201,11 @@ collection_item:
     font->nfonts = nfonts;
     return font;
 }
-int asg_get_otf_font_count(AsgOTF*font) {
+int ags_get_otf_font_count(AgsOTF*font) {
     return font? font->nfonts: 0;
 }
 
-void asg_free_otf(AsgOTF *font) {
+void ags_free_otf(AgsOTF *font) {
     if (font) {
         free((void*)font->family);
         free((void*)font->style_name);
@@ -1215,7 +1215,7 @@ void asg_free_otf(AsgOTF *font) {
         free(font);
     }
 }
-void asg_scale_otf(AsgOTF *font, float height, float width) {
+void ags_scale_otf(AgsOTF *font, float height, float width) {
     float s = font->ascender - font->descender;
     if (width <= 0)
         width = height;
@@ -1223,58 +1223,58 @@ void asg_scale_otf(AsgOTF *font, float height, float width) {
     font->scale_y = height / font->em;
 }
 
-float asg_get_otf_ascender(const AsgOTF *font) {
+float ags_get_otf_ascender(const AgsOTF *font) {
     return font->ascender * font->scale_y;
 }
-float asg_get_otf_descender(const AsgOTF *font) {
+float ags_get_otf_descender(const AgsOTF *font) {
     return font->descender * font->scale_y;
 }
-float asg_get_otf_leading(const AsgOTF *font) {
+float ags_get_otf_leading(const AgsOTF *font) {
     return font->leading * font->scale_y;
 }
-float asg_get_otf_em(const AsgOTF *font) {
+float ags_get_otf_em(const AgsOTF *font) {
     return font->em * font->scale_y;
 }
-float asg_get_otf_x_height(const AsgOTF *font) {
+float ags_get_otf_x_height(const AgsOTF *font) {
     return font->x_height * font->scale_y;
 }
-float asg_get_otf_cap_height(const AsgOTF *font) {
+float ags_get_otf_cap_height(const AgsOTF *font) {
     return font->cap_height * font->scale_y;
 }
-AsgFontWeight asg_get_otf_weight(const AsgOTF *font) {
+AgsFontWeight ags_get_otf_weight(const AgsOTF *font) {
     return font->weight;
 }
-AsgFontStretch asg_get_otf_stretch(const AsgOTF *font) {
+AgsFontStretch ags_get_otf_stretch(const AgsOTF *font) {
     return font->stretch;
 }
-AsgRect asg_get_otf_subscript(const AsgOTF *font) {
+AgsRect ags_get_otf_subscript(const AgsOTF *font) {
     return font->superscript_box;
 }
-AsgRect asg_get_otf_superscript(const AsgOTF *font) {
+AgsRect ags_get_otf_superscript(const AgsOTF *font) {
     return font->superscript_box;
 }
-bool asg_is_otf_monospaced(const AsgOTF *font) {
+bool ags_is_otf_monospaced(const AgsOTF *font) {
     return font->panose[3] == 9; // PANOSE porportion = 9 (monospaced)
 }
-bool asg_is_otf_italic(const AsgOTF *font) {
+bool ags_is_otf_italic(const AgsOTF *font) {
     return font->is_italic;
 }
-const wchar_t *asg_get_otf_family(const AsgOTF *font) {
+const wchar_t *ags_get_otf_family(const AgsOTF *font) {
     return font->family;
 }
-const wchar_t *asg_get_otf_name(const AsgOTF *font) {
+const wchar_t *ags_get_otf_name(const AgsOTF *font) {
     return font->name;
 }
-const wchar_t *asg_get_otf_style_name(const AsgOTF *font) {
+const wchar_t *ags_get_otf_style_name(const AgsOTF *font) {
     return font->style_name;
 }
 static char *lookup_otf_features(
-    AsgOTF *font,
+    AgsOTF *font,
     const uint8_t *table,
     uint32_t script,
     uint32_t lang,
     const char *feature_tags,
-    void subtable_handler(AsgOTF *font, uint32_t tag, const uint8_t *subtable, int lookup_type))
+    void subtable_handler(AgsOTF *font, uint32_t tag, const uint8_t *subtable, int lookup_type))
 {
     if (!table)
         return NULL;
@@ -1395,7 +1395,7 @@ static char *lookup_otf_features(
     }
     return all_features;
 }
-static void gsub_handler(AsgOTF *font, uint32_t tag, const uint8_t *subtable_base, int lookup_type) {
+static void gsub_handler(AgsOTF *font, uint32_t tag, const uint8_t *subtable_base, int lookup_type) {
     const uint8_t *subtable = subtable_base;
     uint16_t subst_format, coverage_offset;
 
@@ -1424,7 +1424,7 @@ redo_subtable:
                     uint16_t input;
                     unpack(&coverage, "S", &input);
                     uint16_t output = input + delta;
-                    asg_substitute_otf_glyph(font, input, output);
+                    ags_substitute_otf_glyph(font, input, output);
                 }
             else if (coverage_format == 2)
                 for (int i = 0; i < count; i++) {
@@ -1433,7 +1433,7 @@ redo_subtable:
                     for (int glyph = start; glyph <= end; glyph++) {
                         uint16_t input = glyph;
                         uint16_t output = input + delta;
-                        asg_substitute_otf_glyph(font, input, output);
+                        ags_substitute_otf_glyph(font, input, output);
                     }
                 }
         }
@@ -1447,7 +1447,7 @@ redo_subtable:
                     uint16_t output;
                     unpack(&coverage, "S", &input);
                     unpack(&subtable, "S", &output);
-                    asg_substitute_otf_glyph(font, input, output);
+                    ags_substitute_otf_glyph(font, input, output);
                 }
             else if (coverage_format == 2)
                 for (int i = 0; i < count; i++) {
@@ -1457,17 +1457,17 @@ redo_subtable:
                         uint16_t output;
                         uint16_t input = glyph;
                         unpack(&subtable, "S", &output);
-                        asg_substitute_otf_glyph(font, input, output);
+                        ags_substitute_otf_glyph(font, input, output);
                     }
                 }
         }
     }
 }
-char *asg_get_otf_features(const AsgOTF *font) {
-    return lookup_otf_features((AsgOTF*)font, font->gsub, 'latn', 'eng ', "", NULL);
+char *ags_get_otf_features(const AgsOTF *font) {
+    return lookup_otf_features((AgsOTF*)font, font->gsub, 'latn', 'eng ', "", NULL);
 }
 
-void asg_set_otf_features(AsgOTF *font, const uint8_t *features) {
+void ags_set_otf_features(AgsOTF *font, const uint8_t *features) {
     free(font->features);
     free(font->subst);
     font->nsubst = 0;
@@ -1476,25 +1476,25 @@ void asg_set_otf_features(AsgOTF *font, const uint8_t *features) {
     if (*features)
         lookup_otf_features(font, font->gsub, font->script, font->lang, features, gsub_handler);
 }
-void asg_substitute_otf_glyph(AsgOTF *font, uint16_t in, uint16_t out) {
+void ags_substitute_otf_glyph(AgsOTF *font, uint16_t in, uint16_t out) {
     font->subst = realloc(font->subst, (font->nsubst + 1) * 2 * sizeof *font->subst);
     font->subst[font->nsubst][0] = in;
     font->subst[font->nsubst][1] = out;
     font->nsubst++;
 }
 
-float asg_get_otf_glyph_lsb(const AsgOTF *font, unsigned g) {
+float ags_get_otf_glyph_lsb(const AgsOTF *font, unsigned g) {
     return  g < font->nhmtx?    be16(font->hmtx[g * 2 + 1]) * font->scale_x:
             g < font->nglyphs?  be16(font->hmtx[(font->nhmtx - 1) * 2 + 1]) * font->scale_x:
             0;
 }
-float asg_get_otf_glyph_width(const AsgOTF *font, unsigned g) {
+float ags_get_otf_glyph_width(const AgsOTF *font, unsigned g) {
     return  g < font->nhmtx?    be16(font->hmtx[g * 2]) * font->scale_x:
             g < font->nglyphs?  be16(font->hmtx[(font->nhmtx - 1) * 2]) * font->scale_x:
             0;
 }
 
-static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, unsigned g) {
+static void glyph_path(AgsPath *path, const AgsOTF *font, const AgsMatrix *ctm, unsigned g) {
     if (g >= font->nglyphs)
         g = 0;
     const void          *data;
@@ -1520,7 +1520,7 @@ static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, 
         do {
             unpack(&data, "SS", &flags, &glyph);
             
-            AsgMatrix new_ctm = AsgIdentityMatrix;
+            AgsMatrix new_ctm = AgsIdentityMatrix;
             
             if (flags & 1) // args are words
                 unpack(&data, "SS", &arg1, &arg2);
@@ -1532,7 +1532,7 @@ static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, 
             }
             
             if (flags & 2) // args are x & y
-                asg_matrix_translate(&new_ctm, arg1, arg2);
+                ags_matrix_translate(&new_ctm, arg1, arg2);
             else {
                 // TODO: "matching points"
             }
@@ -1547,8 +1547,8 @@ static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, 
             else if (flags & 128) // 2x2 matrix
                 unpack(&data, "SSSS", &sx, &shearx, &sheary, &sy);
             
-            asg_matrix_scale(&new_ctm, sx, sy);
-            asg_matrix_multiply(&new_ctm, ctm);
+            ags_matrix_scale(&new_ctm, sx, sy);
+            ags_matrix_multiply(&new_ctm, ctm);
             glyph_path(path, font, &new_ctm, glyph);
         } while (flags & 32);
     } else {
@@ -1574,14 +1574,14 @@ static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, 
         }
         const uint8_t   *xs = f;
         const uint8_t   *ys = xs + xsize;
-        AsgPoint a = {0, 0};
-        AsgPoint b;
+        AgsPoint a = {0, 0};
+        AgsPoint b;
         bool in_curve = false;
         
         
         int vx = 0;
         int vy = 0;
-        AsgPoint start;
+        AgsPoint start;
         for (int i = 0, rep = 0, end = 0; i < npoints; i++) {
             int dx =    *flags & 2? *flags & 16? *xs++: -*xs++:
                         *flags & 16? 0:
@@ -1591,23 +1591,23 @@ static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, 
                         (int16_t)be16(((int16_t*)(ys+=2))[-1]);
             vx += dx;
             vy += dy;
-            AsgPoint p = {vx, vy};
+            AgsPoint p = {vx, vy};
     
             
             if (i == end) {
                 end = be16(*ends++) + 1;
                 if (in_curve)
-                    asg_add_bezier3(path, ctm, b, start);
+                    ags_add_bezier3(path, ctm, b, start);
                 else
-                    asg_close_subpath(path);
+                    ags_close_subpath(path);
                 if (i != npoints - 1)
-                    asg_add_subpath(path, ctm, p);
+                    ags_add_subpath(path, ctm, p);
                 start = a = p;
                 in_curve = false;
             } else if (~*flags & 1) // curve
                 if (in_curve) {
-                    AsgPoint q = mid(b, p);
-                    asg_add_bezier3(path, ctm, b, q);
+                    AgsPoint q = mid(b, p);
+                    ags_add_bezier3(path, ctm, b, q);
                     a = q;
                     b = p;
                 } else {
@@ -1615,11 +1615,11 @@ static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, 
                     in_curve = true;
                 }
             else if (in_curve) { // curve to line
-                asg_add_bezier3(path, ctm, b, p);
+                ags_add_bezier3(path, ctm, b, p);
                 a = p;
                 in_curve = false;
             } else { // line to line
-                asg_add_line(path, ctm, p);
+                ags_add_line(path, ctm, p);
                 a = p;
             }
             
@@ -1633,89 +1633,89 @@ static void glyph_path(AsgPath *path, const AsgOTF *font, const AsgMatrix *ctm, 
                 flags++;
         }
         if (in_curve)
-            asg_add_bezier3(path, ctm, b, start);
+            ags_add_bezier3(path, ctm, b, start);
         else
-            asg_close_subpath(path);
+            ags_close_subpath(path);
     }
 }
-AsgPath *asg_get_otf_glyph_path(
-    const AsgOTF *font,
-    const AsgMatrix *ctm,
+AgsPath *ags_get_otf_glyph_path(
+    const AgsOTF *font,
+    const AgsMatrix *ctm,
     unsigned g)
 {
-    AsgPath *path = asg_new_path();
-    AsgMatrix new_ctm = {1,0,0, 1,0,0};
-    asg_matrix_translate(&new_ctm, 0, -font->ascender);
-    asg_matrix_scale(&new_ctm, font->scale_x, -font->scale_y);
-    asg_matrix_multiply(&new_ctm, ctm);
+    AgsPath *path = ags_new_path();
+    AgsMatrix new_ctm = {1,0,0, 1,0,0};
+    ags_matrix_translate(&new_ctm, 0, -font->ascender);
+    ags_matrix_scale(&new_ctm, font->scale_x, -font->scale_y);
+    ags_matrix_multiply(&new_ctm, ctm);
     glyph_path(path, font, &new_ctm, g);
     return path;
 }
-float asg_otf_fill_glyph(
-    Asg *gs,
-    const AsgOTF *font,
-    AsgPoint at,
+float ags_otf_fill_glyph(
+    Ags *gs,
+    const AgsOTF *font,
+    AgsPoint at,
     unsigned g,
     uint32_t color)
 {
-    float width = asg_get_otf_glyph_width(font, g);
-    float em = asg_get_otf_em(font);
+    float width = ags_get_otf_glyph_width(font, g);
+    float em = ags_get_otf_em(font);
     if (!within_int(-em, at.x, gs->width+em) || !within_int(-em, at.y, gs->height+em))
         return width;
     
-    AsgMatrix ctm = gs->ctm;
-    asg_matrix_translate(&ctm, at.x, at.y);
-    AsgPath *path = asg_get_otf_glyph_path(font, &ctm, g);
+    AgsMatrix ctm = gs->ctm;
+    ags_matrix_translate(&ctm, at.x, at.y);
+    AgsPath *path = ags_get_otf_glyph_path(font, &ctm, g);
     if (path) {
-        asg_fill_path(gs, path, color);
-        asg_free_path(path);
+        ags_fill_path(gs, path, color);
+        ags_free_path(path);
     }
     return width;
 }
 
-unsigned asg_get_otf_glyph(const AsgOTF *font, unsigned c) {
+unsigned ags_get_otf_glyph(const AgsOTF *font, unsigned c) {
     unsigned g = font->cmap[c & 0xffff];
     for (int i = 0; i < font->nsubst; i++)
         if (g == font->subst[i][0])
             g = font->subst[i][1];
     return g;
 }
-float asg_get_otf_char_lsb(const AsgOTF *font, unsigned c) {
-    return asg_get_otf_glyph_lsb(font, asg_get_otf_glyph(font, c));
+float ags_get_otf_char_lsb(const AgsOTF *font, unsigned c) {
+    return ags_get_otf_glyph_lsb(font, ags_get_otf_glyph(font, c));
 }
-float asg_get_otf_char_width(const AsgOTF *font, unsigned c) {
-    return asg_get_otf_glyph_width(font, asg_get_otf_glyph(font, c));
+float ags_get_otf_char_width(const AgsOTF *font, unsigned c) {
+    return ags_get_otf_glyph_width(font, ags_get_otf_glyph(font, c));
 }
-AsgPath *asg_get_otf_char_path(const AsgOTF *font, const AsgMatrix *ctm, unsigned c) {
-    return asg_get_otf_glyph_path(font, ctm, asg_get_otf_glyph(font, c));
+AgsPath *ags_get_otf_char_path(const AgsOTF *font, const AgsMatrix *ctm, unsigned c) {
+    return ags_get_otf_glyph_path(font, ctm, ags_get_otf_glyph(font, c));
 }
-float asg_otf_fill_char(
-    Asg *gs,
-    const AsgOTF *font,
-    AsgPoint at,
+float ags_otf_fill_char(
+    Ags *gs,
+    const AgsOTF *font,
+    AgsPoint at,
     unsigned c,
     uint32_t color)
 {
-    return asg_otf_fill_glyph(gs, font, at, asg_get_otf_glyph(font, c), color);
+    return ags_otf_fill_glyph(gs, font, at, ags_get_otf_glyph(font, c), color);
 }
 
-float asg_otf_fill_string_utf8(
-    Asg *gs,
-    const AsgOTF *font,
-    AsgPoint at,
+float ags_otf_fill_string_utf8(
+    Ags *gs,
+    const AgsOTF *font,
+    AgsPoint at,
     const char chars[],
     int len,
     uint32_t color)
 {
-    wchar_t *wchars = asg_utf8_to_utf16(chars, len, &len);
-    float width = asg_otf_fill_string(gs, font, at, wchars, len, color);
+    wchar_t *wchars = ags_utf8_to_utf16(chars, len, &len);
+    float width = ags_otf_fill_string(gs, font, at, wchars, len, color);
     free(wchars);
     return width;
 }
-float asg_otf_fill_string(
-    Asg *gs,
-    const AsgOTF *font,
-    AsgPoint at,
+float ags_otf_fill_string(
+    Ags *gs,
+    const AgsOTF *font,
+    AgsPoint at,
     const uint16_t chars[],
     int len,
     uint32_t color)
@@ -1723,19 +1723,19 @@ float asg_otf_fill_string(
     float org = at.x;
     if (len < 0) len = wcslen(chars);
     for (int i = 0; i < len; i++)
-        at.x += asg_otf_fill_glyph(gs, font, at, asg_get_otf_glyph(font, chars[i]), color);
+        at.x += ags_otf_fill_glyph(gs, font, at, ags_get_otf_glyph(font, chars[i]), color);
     return at.x - org;
 }
 
-AsgFont *asg_open_font_file(const wchar_t *filename, int font_index, bool scan_only) {
+AgsFont *ags_open_font_file(const wchar_t *filename, int font_index, bool scan_only) {
     return platform_open_font_file(filename, font_index, scan_only);
 }
-AsgFont *asg_open_font_variant(const wchar_t *family, AsgFontWeight weight, bool italic, AsgFontStretch stretch) {
+AgsFont *ags_open_font_variant(const wchar_t *family, AgsFontWeight weight, bool italic, AgsFontStretch stretch) {
     if (weight < 100) weight = 400;
     if (stretch < 1) stretch = 0;
     if (weight < 900 && stretch < 900) {
         if (Families == NULL)
-            asg_scan_fonts(NULL, NULL);
+            ags_scan_fonts(NULL, NULL);
         
         int f;
         for (f = 0; f < NFamilies; f++)
@@ -1747,161 +1747,161 @@ AsgFont *asg_open_font_variant(const wchar_t *family, AsgFontWeight weight, bool
             const wchar_t **filename = italic? Families[f].italic: Families[f].roman;
             
             if (filename[weight/100])
-                return asg_open_font_file(filename[weight/100], index[weight/100], false);
+                return ags_open_font_file(filename[weight/100], index[weight/100], false);
             if (weight/100+1 <= 9 && filename[weight/100+1])
-                return asg_open_font_file(filename[weight/100+1], index[weight/100+1], false);
+                return ags_open_font_file(filename[weight/100+1], index[weight/100+1], false);
             if (weight/100-1 >= 0 && filename[weight/100-1])
-                return asg_open_font_file(filename[weight/100-1], index[weight/100-1], false);
+                return ags_open_font_file(filename[weight/100-1], index[weight/100-1], false);
         }
     }
     return NULL;
 }
 
-void asg_set_font_features(AsgFont *font, const uint8_t *features) {
-    asg_set_otf_features((void*)font, features);
+void ags_set_font_features(AgsFont *font, const uint8_t *features) {
+    ags_set_otf_features((void*)font, features);
 }
-void asg_substitute_glyph(AsgFont *font, uint16_t in, uint16_t out) {
-    asg_substitute_otf_glyph((void*)font, in, out);
+void ags_substitute_glyph(AgsFont *font, uint16_t in, uint16_t out) {
+    ags_substitute_otf_glyph((void*)font, in, out);
 }
 
-AsgFont *asg_load_font(const void *file, int font_index, bool scan_only) {
-    return (void*)asg_load_otf((void*)file, font_index, scan_only);
+AgsFont *ags_load_font(const void *file, int font_index, bool scan_only) {
+    return (void*)ags_load_otf((void*)file, font_index, scan_only);
 }
-int asg_get_font_font_count(AsgFont *font) {
-    return asg_get_otf_font_count((void*)font);
+int ags_get_font_font_count(AgsFont *font) {
+    return ags_get_otf_font_count((void*)font);
 }
-void asg_free_font(AsgFont *font) {
+void ags_free_font(AgsFont *font) {
     if (font) {
         if (font->host_free)
             font->host_free(font);
-        asg_free_otf((void*)font);
+        ags_free_otf((void*)font);
     }
 }
-void asg_scale_font(AsgFont *font, float height, float width) {
-    asg_scale_otf((void*)font, height, width);
+void ags_scale_font(AgsFont *font, float height, float width) {
+    ags_scale_otf((void*)font, height, width);
 }
-float asg_get_font_ascender(const AsgFont *font) {
-    return asg_get_otf_ascender((void*)font);
+float ags_get_font_ascender(const AgsFont *font) {
+    return ags_get_otf_ascender((void*)font);
 }
-float asg_get_font_descender(const AsgFont *font) {
-    return asg_get_otf_descender((void*)font);
+float ags_get_font_descender(const AgsFont *font) {
+    return ags_get_otf_descender((void*)font);
 }
-float asg_get_font_leading(const AsgFont *font) {
-    return asg_get_otf_leading((void*)font);
+float ags_get_font_leading(const AgsFont *font) {
+    return ags_get_otf_leading((void*)font);
 }
-float asg_get_font_em(const AsgFont *font) {
-    return asg_get_otf_em((void*)font);
+float ags_get_font_em(const AgsFont *font) {
+    return ags_get_otf_em((void*)font);
 }
-float asg_get_font_x_height(const AsgFont *font) {
-    return asg_get_otf_x_height((void*)font);
+float ags_get_font_x_height(const AgsFont *font) {
+    return ags_get_otf_x_height((void*)font);
 }
-float asg_get_font_cap_height(const AsgFont *font) {
-    return asg_get_otf_cap_height((void*)font);
+float ags_get_font_cap_height(const AgsFont *font) {
+    return ags_get_otf_cap_height((void*)font);
 }
-AsgFontWeight asg_get_font_weight(const AsgFont *font) {
-    return asg_get_otf_weight((void*)font);
+AgsFontWeight ags_get_font_weight(const AgsFont *font) {
+    return ags_get_otf_weight((void*)font);
 }
-AsgFontStretch asg_get_font_stretch(const AsgFont *font) {
-    return asg_get_otf_stretch((void*)font);
+AgsFontStretch ags_get_font_stretch(const AgsFont *font) {
+    return ags_get_otf_stretch((void*)font);
 }
-AsgRect asg_get_font_subscript(const AsgFont *font) {
-    return asg_get_otf_subscript((void*)font);
+AgsRect ags_get_font_subscript(const AgsFont *font) {
+    return ags_get_otf_subscript((void*)font);
 }
-AsgRect asg_get_font_superscript(const AsgFont *font) {
-    return asg_get_otf_superscript((void*)font);
+AgsRect ags_get_font_superscript(const AgsFont *font) {
+    return ags_get_otf_superscript((void*)font);
 }
-bool asg_is_font_monospaced(const AsgFont *font) {
-    return asg_is_otf_monospaced((void*)font);
+bool ags_is_font_monospaced(const AgsFont *font) {
+    return ags_is_otf_monospaced((void*)font);
 }
-bool asg_is_font_italic(const AsgFont *font) {
-    return asg_is_otf_italic((void*)font);
+bool ags_is_font_italic(const AgsFont *font) {
+    return ags_is_otf_italic((void*)font);
 }
-const wchar_t *asg_get_font_family(const AsgFont *font) {
-    return asg_get_otf_family((void*)font);
+const wchar_t *ags_get_font_family(const AgsFont *font) {
+    return ags_get_otf_family((void*)font);
 }
-const wchar_t *asg_get_font_name(const AsgFont *font) {
-    return asg_get_otf_name((void*)font);
+const wchar_t *ags_get_font_name(const AgsFont *font) {
+    return ags_get_otf_name((void*)font);
 }
-const wchar_t *asg_get_font_style_name(const AsgFont *font) {
-    return asg_get_otf_style_name((void*)font);
+const wchar_t *ags_get_font_style_name(const AgsFont *font) {
+    return ags_get_otf_style_name((void*)font);
 }
-char *asg_get_font_features(const AsgFont *font) {
-    return asg_get_otf_features((void*)font);
+char *ags_get_font_features(const AgsFont *font) {
+    return ags_get_otf_features((void*)font);
 }
 
-float asg_get_char_lsb(const AsgFont *font, unsigned c) {
-    return asg_get_otf_char_lsb((void*)font, c);
+float ags_get_char_lsb(const AgsFont *font, unsigned c) {
+    return ags_get_otf_char_lsb((void*)font, c);
 }
-float asg_get_char_width(const AsgFont *font, unsigned c) {
-    return asg_get_otf_char_width((void*)font, c);
+float ags_get_char_width(const AgsFont *font, unsigned c) {
+    return ags_get_otf_char_width((void*)font, c);
 }
-float asg_get_chars_width(const AsgFont *font, const char chars[], int len) {
+float ags_get_chars_width(const AgsFont *font, const char chars[], int len) {
     float width = 0;
     if (len < 0) len = strlen(chars);
-    for (int i = 0; i < len; i++) width += asg_get_char_width(font, chars[i]);
+    for (int i = 0; i < len; i++) width += ags_get_char_width(font, chars[i]);
     return width;
 }
-float asg_get_wchars_width(const AsgFont *font, const wchar_t chars[], int len) {
+float ags_get_wchars_width(const AgsFont *font, const wchar_t chars[], int len) {
     float width = 0;
     if (len < 0) len = wcslen(chars);
-    for (int i = 0; i < len; i++) width += asg_get_char_width(font, chars[i]);
+    for (int i = 0; i < len; i++) width += ags_get_char_width(font, chars[i]);
     return width;
 }
-float asg_fill_char(
-    Asg *gs,
-    const AsgFont *font,
-    AsgPoint at,
+float ags_fill_char(
+    Ags *gs,
+    const AgsFont *font,
+    AgsPoint at,
     unsigned c,
     uint32_t color)
 {
-    return asg_otf_fill_char(gs, (void*)font, at, c, color);
+    return ags_otf_fill_char(gs, (void*)font, at, c, color);
 }
-float asg_fill_string_utf8(
-    Asg *gs,
-    const AsgFont *font,
-    AsgPoint at,
+float ags_fill_string_utf8(
+    Ags *gs,
+    const AgsFont *font,
+    AgsPoint at,
     const uint8_t chars[],
     int len,
     uint32_t color)
 {
-    return asg_otf_fill_string_utf8(gs, (void*)font, at, chars, len, color);
+    return ags_otf_fill_string_utf8(gs, (void*)font, at, chars, len, color);
 }
-float asg_fill_string(
-    Asg *gs,
-    const AsgFont *font,
-    AsgPoint at,
+float ags_fill_string(
+    Ags *gs,
+    const AgsFont *font,
+    AgsPoint at,
     const wchar_t chars[],
     int len,
     uint32_t color)
 {
-    return asg_otf_fill_string(gs, (void*)font, at, chars, len, color);
+    return ags_otf_fill_string(gs, (void*)font, at, chars, len, color);
 }
-AsgPath *asg_get_char_path(const AsgFont *font, const AsgMatrix *ctm, unsigned c) {
-    return asg_get_otf_char_path((void*)font, ctm, c);
+AgsPath *ags_get_char_path(const AgsFont *font, const AgsMatrix *ctm, unsigned c) {
+    return ags_get_otf_char_path((void*)font, ctm, c);
 }
-unsigned asg_get_glyph(const AsgFont *font, unsigned c) {
-    return asg_get_otf_glyph((void*)font, c);
+unsigned ags_get_glyph(const AgsFont *font, unsigned c) {
+    return ags_get_otf_glyph((void*)font, c);
 }
-float asg_get_glyph_lsb(const AsgFont *font, unsigned g) {
-    return asg_get_otf_glyph_lsb((void*)font, g);
+float ags_get_glyph_lsb(const AgsFont *font, unsigned g) {
+    return ags_get_otf_glyph_lsb((void*)font, g);
 }
-float asg_get_glyph_width(const AsgFont *font, unsigned g) {
-    return asg_get_otf_glyph_width((void*)font, g);
+float ags_get_glyph_width(const AgsFont *font, unsigned g) {
+    return ags_get_otf_glyph_width((void*)font, g);
 }
-float asg_fill_glyph(
-    Asg *gs,
-    const AsgFont *font,
-    AsgPoint at,
+float ags_fill_glyph(
+    Ags *gs,
+    const AgsFont *font,
+    AgsPoint at,
     unsigned g,
     uint32_t color)
 {
-    return asg_otf_fill_glyph(gs, (void*)font, at, g, color);
+    return ags_otf_fill_glyph(gs, (void*)font, at, g, color);
 }
-AsgPath *asg_get_glyph_path(const AsgFont *font, const AsgMatrix *ctm, unsigned g) {
-    return asg_get_otf_glyph_path((void*)font, ctm, g);
+AgsPath *ags_get_glyph_path(const AgsFont *font, const AgsMatrix *ctm, unsigned g) {
+    return ags_get_otf_glyph_path((void*)font, ctm, g);
 }
 
-AsgPath *asg_get_svg_path(const char *svg, const AsgMatrix *initial_ctm) {
+AgsPath *ags_get_svg_path(const char *svg, const AgsMatrix *initial_ctm) {
     static char params[256];
     if (!params['m']) {
         char *name = "mzlhvcsqt";
@@ -1911,12 +1911,12 @@ AsgPath *asg_get_svg_path(const char *svg, const AsgMatrix *initial_ctm) {
             params[name[i]] = params[toupper(name[i])] = n[i];
     }
     
-    AsgMatrix   ctm = initial_ctm? *initial_ctm: AsgIdentityMatrix;
-    AsgPath     *path = asg_new_path();
-    AsgPoint    cur = {0,0};
-    AsgPoint    start = {0,0};
-    AsgPoint    reflect = {0,0};
-    AsgPoint    b, c;
+    AgsMatrix   ctm = initial_ctm? *initial_ctm: AgsIdentityMatrix;
+    AgsPath     *path = ags_new_path();
+    AgsPoint    cur = {0,0};
+    AgsPoint    start = {0,0};
+    AgsPoint    reflect = {0,0};
+    AgsPoint    b, c;
     int         cmd;
     float       a[6];
     while (*svg) {
@@ -1936,89 +1936,89 @@ AsgPath *asg_get_svg_path(const char *svg, const AsgMatrix *initial_ctm) {
 
         switch (cmd) {
         case 'm':
-            start = cur = asg_pt(cur.x + a[0], cur.y + a[1]);
-            asg_add_subpath(path, &ctm, cur);
+            start = cur = ags_pt(cur.x + a[0], cur.y + a[1]);
+            ags_add_subpath(path, &ctm, cur);
             break;
         case 'M':
-            start = cur = asg_pt(a[0], a[1]);
-            asg_add_subpath(path, &ctm, cur);
+            start = cur = ags_pt(a[0], a[1]);
+            ags_add_subpath(path, &ctm, cur);
             break;
         case 'Z':
         case 'z':
-            asg_close_subpath(path);
+            ags_close_subpath(path);
             cur = start;
             break;
         case 'L':
-            cur = asg_pt(a[0], a[1]);
-            asg_add_line(path, &ctm, cur);
+            cur = ags_pt(a[0], a[1]);
+            ags_add_line(path, &ctm, cur);
             break;
         case 'l':
-            cur = asg_pt(cur.x + a[0], cur.y + a[1]);
-            asg_add_line(path, &ctm, cur);
+            cur = ags_pt(cur.x + a[0], cur.y + a[1]);
+            ags_add_line(path, &ctm, cur);
             break;
         case 'h':
-            cur = asg_pt(cur.x + a[0], cur.y);
-            asg_add_line(path, &ctm, cur);
+            cur = ags_pt(cur.x + a[0], cur.y);
+            ags_add_line(path, &ctm, cur);
             break;
         case 'H':
-            cur = asg_pt(a[0], cur.y);
-            asg_add_line(path, &ctm, cur);
+            cur = ags_pt(a[0], cur.y);
+            ags_add_line(path, &ctm, cur);
             break;
         case 'v':
-            cur = asg_pt(cur.x, cur.y + a[0]);
-            asg_add_line(path, &ctm, cur);
+            cur = ags_pt(cur.x, cur.y + a[0]);
+            ags_add_line(path, &ctm, cur);
             break;
         case 'V':
-            cur = asg_pt(cur.x, a[0]);
-            asg_add_line(path, &ctm, cur);
+            cur = ags_pt(cur.x, a[0]);
+            ags_add_line(path, &ctm, cur);
             break;
         case 'c':
-            b = asg_pt(cur.x + a[0], cur.y + a[1]);
-            reflect = asg_pt(cur.x + a[2], cur.y + a[3]);
-            cur = asg_pt(cur.x + a[4], cur.y + a[5]);
-            asg_add_bezier4(path, &ctm, b, reflect, cur);
+            b = ags_pt(cur.x + a[0], cur.y + a[1]);
+            reflect = ags_pt(cur.x + a[2], cur.y + a[3]);
+            cur = ags_pt(cur.x + a[4], cur.y + a[5]);
+            ags_add_bezier4(path, &ctm, b, reflect, cur);
             break;
         case 'C':
-            b = asg_pt(a[0], a[1]);
-            reflect = asg_pt(a[2], a[3]);
-            cur = asg_pt(a[4], a[5]);
-            asg_add_bezier4(path, &ctm, b, reflect, cur);
+            b = ags_pt(a[0], a[1]);
+            reflect = ags_pt(a[2], a[3]);
+            cur = ags_pt(a[4], a[5]);
+            ags_add_bezier4(path, &ctm, b, reflect, cur);
             break;
         case 's':
-            b = asg_pt( cur.x + (cur.x - reflect.x),
+            b = ags_pt( cur.x + (cur.x - reflect.x),
                     cur.y + (cur.y - reflect.y));
-            reflect = asg_pt(cur.x + a[0], cur.y + a[1]);
-            cur = asg_pt(cur.x + a[2], cur.y + a[3]);
-            asg_add_bezier4(path, &ctm, b, reflect, cur);
+            reflect = ags_pt(cur.x + a[0], cur.y + a[1]);
+            cur = ags_pt(cur.x + a[2], cur.y + a[3]);
+            ags_add_bezier4(path, &ctm, b, reflect, cur);
             break;
         case 'S':
-            b = asg_pt( cur.x + (cur.x - reflect.x),
+            b = ags_pt( cur.x + (cur.x - reflect.x),
                     cur.y + (cur.y - reflect.y));
-            reflect = asg_pt(a[0], a[1]);
-            cur = asg_pt(a[2], a[3]);
-            asg_add_bezier4(path, &ctm, b, reflect, cur);
+            reflect = ags_pt(a[0], a[1]);
+            cur = ags_pt(a[2], a[3]);
+            ags_add_bezier4(path, &ctm, b, reflect, cur);
             break;
         case 'q':
-            reflect = asg_pt(cur.x + a[0], cur.y + a[1]);
-            cur = asg_pt(cur.x + a[2], cur.y + a[3]);
-            asg_add_bezier3(path, &ctm, reflect, cur);
+            reflect = ags_pt(cur.x + a[0], cur.y + a[1]);
+            cur = ags_pt(cur.x + a[2], cur.y + a[3]);
+            ags_add_bezier3(path, &ctm, reflect, cur);
             break;
         case 'Q':
-            reflect = asg_pt(a[0], a[1]);
-            cur = asg_pt(a[2], a[3]);
-            asg_add_bezier3(path, &ctm, reflect, cur);
+            reflect = ags_pt(a[0], a[1]);
+            cur = ags_pt(a[2], a[3]);
+            ags_add_bezier3(path, &ctm, reflect, cur);
             break;
         case 't':
-            reflect = asg_pt(cur.x + (cur.x - reflect.x),
+            reflect = ags_pt(cur.x + (cur.x - reflect.x),
                          cur.y + (cur.y - reflect.y));
-            cur = asg_pt(cur.x + a[0], cur.y + a[1]);
-            asg_add_bezier3(path, &ctm, reflect, cur);
+            cur = ags_pt(cur.x + a[0], cur.y + a[1]);
+            ags_add_bezier3(path, &ctm, reflect, cur);
             break;
         case 'T':
-            reflect = asg_pt(cur.x + (cur.x - reflect.x),
+            reflect = ags_pt(cur.x + (cur.x - reflect.x),
                          cur.y + (cur.y - reflect.y));
-            cur = asg_pt(a[0], a[1]);
-            asg_add_bezier3(path, &ctm, reflect, cur);
+            cur = ags_pt(a[0], a[1]);
+            ags_add_bezier3(path, &ctm, reflect, cur);
             break;
         }
     }

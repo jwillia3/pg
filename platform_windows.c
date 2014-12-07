@@ -8,8 +8,8 @@
 #include <wchar.h>
 #include <windows.h>
 #pragma comment(lib, "advapi32")
-#include "asg.h"
-#include "platform.h"
+#include <ags/ags.h>
+#include <ags/platform.h>
 
 typedef struct {
     HANDLE file;
@@ -56,7 +56,7 @@ static void free_file_mapping(Host *host) {
     CloseHandle(host->file);
 }
 
-void platform_scan_directory(const wchar_t *dir, void per_file(const wchar_t *name, void *data)) {
+void ags_platform_scan_directory(const wchar_t *dir, void per_file(const wchar_t *name, void *data)) {
     WIN32_FIND_DATA data;
     if (!dir)
         dir = L"C:\\Windows\\Fonts";
@@ -83,7 +83,7 @@ void platform_scan_directory(const wchar_t *dir, void per_file(const wchar_t *na
     }
 }
 
-static void host_free(AsgFont *font) {
+static void host_free(AgsFont *font) {
     free_file_mapping(font->host);
     free(font->host);
 }
@@ -100,7 +100,7 @@ wchar_t **platform_list_fonts(int *countp) {
     DWORD nchild;
     RegQueryInfoKey(key, 0,0, 0, 0,0, 0, &nchild, 0, 0, 0, 0);
     
-    AsgFont *font = NULL;
+    AgsFont *font = NULL;
     
     for (int i = 0; i < nchild; i++) {
         wchar_t name_buffer[4096];
@@ -135,11 +135,11 @@ wchar_t **platform_list_fonts(int *countp) {
     return out;
 }
 
-AsgFont *platform_open_font_file(const wchar_t *filename, int font_index, bool scan_only) {
+AgsFont *platform_open_font_file(const wchar_t *filename, int font_index, bool scan_only) {
     Host *host = calloc(1, sizeof *host);
     void *data = load_file(host, filename);
     if (data) {
-        AsgFont *font = asg_load_font(data, font_index, false);
+        AgsFont *font = ags_load_font(data, font_index, false);
         if (font) {
             font->host = host;
             font->host_free = host_free;

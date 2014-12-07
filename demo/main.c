@@ -12,10 +12,10 @@
 
 HBITMAP Bitmap;
 
-#include "../asg.h"
+#include <ags/ags.h>
 #include "test.h"
 
-Asg *gs;
+Ags *gs;
 int Tick;
 int animate;
 void render();
@@ -116,29 +116,29 @@ int lex_sort(const void *a, const void *b) {
 }
 
 const float line_height = 12;
-float list_font_test_variant(AsgFontFamily *family, bool italic, int weight, AsgPoint pt) {
-	AsgFont *font = asg_open_font_file(
+float list_font_test_variant(AgsFontFamily *family, bool italic, int weight, AgsPoint pt) {
+	AgsFont *font = ags_open_font_file(
 		italic? family->italic[weight]: family->roman[weight],
 		italic? family->italic_index[weight]: family->roman_index[weight],
 		false);
 	
 	if (!font)
 		return 0;
-	asg_scale_font(font, line_height, 0);
-	float x2 = asg_fill_string(gs, font, pt, asg_get_font_name(font), -1, fg);
+	ags_scale_font(font, line_height, 0);
+	float x2 = ags_fill_string(gs, font, pt, ags_get_font_name(font), -1, fg);
 	char buf[10];
 	sprintf(buf, " %d", weight*100);
-	x2 += asg_fill_string_utf8(gs, font, asg_pt(pt.x + x2, pt.y), buf, -1, fg);
-	asg_free_font(font);
+	x2 += ags_fill_string_utf8(gs, font, ags_pt(pt.x + x2, pt.y), buf, -1, fg);
+	ags_free_font(font);
 	return x2;
 }
 void list_font_test() {
 	
 	int nfamilies;
 	float max_width = 0;
-	AsgFontFamily *families = asg_scan_fonts(NULL, &nfamilies);
+	AgsFontFamily *families = ags_scan_fonts(NULL, &nfamilies);
 	
-	AsgPoint pt = { 0, 0 };
+	AgsPoint pt = { 0, 0 };
 	for (int f = 0; f < nfamilies; f++) {
 	
 		for (int weight = 0; weight < 10; weight++)
@@ -155,15 +155,15 @@ void list_font_test() {
 					}
 				}
 			}
-		asg_free_font_family(&families[f]);
+		ags_free_font_family(&families[f]);
 	}
 }
 void alice_test() {
-    static AsgFont *font;
+    static AgsFont *font;
     if (!font) {
-//        font = asg_open_font_variant(L"Cambria", 400, false, 0);
-        font = asg_open_font_variant(L"RijksoverheidSerif", 400, false, 0);
-		asg_set_font_features(font, "onum");
+//        font = ags_open_font_variant(L"Cambria", 400, false, 0);
+        font = ags_open_font_variant(L"RijksoverheidSerif", 400, false, 0);
+		ags_set_font_features(font, "onum");
 	}
     if (!font) return;
 
@@ -175,13 +175,13 @@ void alice_test() {
         float font_size = 15.f;
         float line_height = (font_size * 1.125);
 		float measure = 500;
-		asg_scale_font(font, font_size, 0);
+		ags_scale_font(font, font_size, 0);
 		for (int i = 0, start = skip; i < gs->height / line_height; i++) {
             if (i + start == 0)
-                asg_scale_font(font, font_size*1.75, 0);
+                ags_scale_font(font, font_size*1.75, 0);
             else if (i == 1)
-                asg_scale_font(font, font_size, 0);
-			float max_space = asg_get_char_width(font, ' ') * 3.f;
+                ags_scale_font(font, font_size, 0);
+			float max_space = ags_get_char_width(font, ' ') * 3.f;
 			
 			// Segment into words
 			char buf[1024];
@@ -198,7 +198,7 @@ void alice_test() {
 				
 				while (*in && !isspace(*in)) *out++ = *in++;
 				*out++ = 0;
-				widths[nwords] = asg_get_chars_width(font, words[nwords], -1);
+				widths[nwords] = ags_get_chars_width(font, words[nwords], -1);
 				nwords++;
 			}
 			
@@ -207,12 +207,12 @@ void alice_test() {
 				space -= widths[i];
 			space /= nwords;
 			if (space > max_space)
-				space = asg_get_char_width(font, ' ');
+				space = ags_get_char_width(font, ' ');
 			
 			// Print word at a time
-			AsgPoint p = { gs->width / 2 - measure / 2, i * line_height };
+			AgsPoint p = { gs->width / 2 - measure / 2, i * line_height };
 			for (int i = 0; i < nwords; i++) {
-				asg_fill_string_utf8(gs,
+				ags_fill_string_utf8(gs,
 	                font,
 	                p,
 	                words[i],
@@ -230,7 +230,7 @@ void alice_test() {
     }
 }
 void letters_test(int language) {
-    static AsgFont *font;
+    static AgsFont *font;
     char *japanese = "%-6.1f 色は匂へど散りぬるを我が世誰ぞ常ならん有為の奥山今日越えて浅き夢見じ酔ひもせず";
     char *english = "%-6.1f The Quick brown=fox jumped over the lazy dog, Götterdämmerung";
 //    wchar_t *font_name = L"Calibri";
@@ -239,8 +239,8 @@ void letters_test(int language) {
 	bool italic = false;
 	
 	if (!font) {
-        font = asg_open_font_variant(font_name, weight, italic, 0);
-		asg_set_font_features(font, "onum,tnum");
+        font = ags_open_font_variant(font_name, weight, italic, 0);
+		ags_set_font_features(font, "onum,tnum");
     }
 	if (!font) return;
     
@@ -249,79 +249,79 @@ void letters_test(int language) {
         sprintf(buf, 
             language? japanese: english,
             f);
-        asg_scale_font(font, f, 0);
-        asg_fill_string_utf8(gs,
+        ags_scale_font(font, f, 0);
+        ags_fill_string_utf8(gs,
             font,
-            asg_pt(x+Tick,y),
+            ags_pt(x+Tick,y),
             buf,
             -1,
             fg);
     }
-	asg_scale_font(font, 72, 0);
-	asg_fill_string(gs,
+	ags_scale_font(font, 72, 0);
+	ags_fill_string(gs,
 		font,
-		asg_pt(300, 0),
+		ags_pt(300, 0),
 		font_name,
 		-1,
 		(fg & 0xffffff) | 0x60000000);
 }
 void glyph_test() {
 	wchar_t *font_name = L"Fira Mono";
-	AsgFont *font = asg_open_font_variant(font_name, 400, false, 0);
+	AgsFont *font = ags_open_font_variant(font_name, 400, false, 0);
 	if (!font) return;
-	float font_height = sqrt(gs->width * gs->height / ((AsgOTF*)font)->nglyphs);
+	float font_height = sqrt(gs->width * gs->height / ((AgsOTF*)font)->nglyphs);
 	
 	unsigned g = 0;
-    unsigned n = ((AsgOTF*)font)->nglyphs;
+    unsigned n = ((AgsOTF*)font)->nglyphs;
 	for (int y = 0; y < gs->height && g < n; y += font_height)
 	for (int x = 0; x < gs->width && g < n; x += font_height) {
         wchar_t buf[5];
 		swprintf(buf, 5, L"%04X", g);
-		asg_scale_font(font, 8, 0);
-		asg_fill_string(gs, font, asg_pt(x,y), buf, 4, 0xff000000);
+		ags_scale_font(font, 8, 0);
+		ags_fill_string(gs, font, ags_pt(x,y), buf, 4, 0xff000000);
 		
 		
-		asg_scale_font(font, font_height-5, 0);
-		asg_fill_glyph(gs, font, asg_pt(x,y+5), g++, fg);
+		ags_scale_font(font, font_height-5, 0);
+		ags_fill_glyph(gs, font, ags_pt(x,y+5), g++, fg);
     }
-	asg_free_font(font);
+	ags_free_font(font);
 }
 
 void svg_test() {
-    asg_translate(gs, -396/2, -468/2);
-    asg_rotate(gs, Tick / 3.f * M_PI / 180.f);
-    asg_translate(gs, gs->width / 2, gs->height / 2);
+    ags_translate(gs, -396/2, -468/2);
+    ags_rotate(gs, Tick / 3.f * M_PI / 180.f);
+    ags_translate(gs, gs->width / 2, gs->height / 2);
     
     for (int i = 0; TestSVG[i]; i++) {
-        AsgPath *path = asg_get_svg_path(TestSVG[i], &gs->ctm);
-        asg_fill_path(gs, path, fg);
-//        asg_stroke_path(gs, path, fg2);
-        asg_free_path(path);
+        AgsPath *path = ags_get_svg_path(TestSVG[i], &gs->ctm);
+        ags_fill_path(gs, path, fg);
+//        ags_stroke_path(gs, path, fg2);
+        ags_free_path(path);
     }
 }
 void simple_test() {
-    asg_scale(gs, .5, .5);
-    asg_rotate(gs, -Tick * M_PI / 180.f);
-    asg_translate(gs, 100, 100);
-    AsgPath *path = asg_new_path();
-    asg_add_subpath(path, &gs->ctm, asg_pt(0, 300));
-    asg_add_bezier4(path, &gs->ctm,
-        asg_pt(0, 250),
-        asg_pt(300, 250),
-        asg_pt(300, 300));
-    asg_add_bezier4(path, &gs->ctm,
-        asg_pt(300, 600),
-        asg_pt(0, 600),
-        asg_pt(0, 300));
+    ags_scale(gs, .5, .5);
+    ags_rotate(gs, -Tick * M_PI / 180.f);
+    ags_translate(gs, 100, 100);
+    AgsPath *path = ags_new_path();
+    ags_add_subpath(path, &gs->ctm, ags_pt(0, 300));
+    ags_add_bezier4(path, &gs->ctm,
+        ags_pt(0, 250),
+        ags_pt(300, 250),
+        ags_pt(300, 300));
+    ags_add_bezier4(path, &gs->ctm,
+        ags_pt(300, 600),
+        ags_pt(0, 600),
+        ags_pt(0, 300));
 
-    asg_close_subpath(path);
-    asg_add_subpath(path, &gs->ctm, asg_pt(300, 0));
-    asg_add_line(path, &gs->ctm, asg_pt(100, 400));
-    asg_add_line(path, &gs->ctm, asg_pt(500, 400));
-    asg_close_subpath(path);
-    asg_fill_path(gs, path, fg);
-//    asg_stroke_path(gs, path, fg2);
-    asg_free_path(path);
+    ags_close_subpath(path);
+    ags_add_subpath(path, &gs->ctm, ags_pt(300, 0));
+    ags_add_line(path, &gs->ctm, ags_pt(100, 400));
+    ags_add_line(path, &gs->ctm, ags_pt(500, 400));
+    ags_close_subpath(path);
+    ags_fill_path(gs, path, fg);
+//    ags_stroke_path(gs, path, fg2);
+    ags_free_path(path);
 }
 
 void benchmark() {
@@ -333,32 +333,32 @@ void benchmark() {
 }
 
 void typography_test(const wchar_t *family) {
-	AsgFont *font = asg_open_font_variant(family, 0,0,0);
+	AgsFont *font = ags_open_font_variant(family, 0,0,0);
 	if (!font) {
-		font = asg_open_font_variant(L"Arial", 0,0,0);
-		asg_scale_font(font, 30, 0);
-		asg_fill_string(gs, font, asg_pt(0,0), L"Font Not Loaded", -1, fg);
-		asg_free_font(font);
+		font = ags_open_font_variant(L"Arial", 0,0,0);
+		ags_scale_font(font, 30, 0);
+		ags_fill_string(gs, font, ags_pt(0,0), L"Font Not Loaded", -1, fg);
+		ags_free_font(font);
 		return;
 	}
 	
 	float heading = 16;
 	float body = 12;
 	
-	char *features = asg_get_font_features(font);
+	char *features = ags_get_font_features(font);
 	if (!features) return;
 	
 	float left = 0;
-	asg_scale_font(font, body, 0);
+	ags_scale_font(font, body, 0);
 	for (int f = 0; features[f]; f += 4) {
-		float w = asg_fill_string_utf8(gs, font, asg_pt(0,f/4*body), features+f, 4, fg);
+		float w = ags_fill_string_utf8(gs, font, ags_pt(0,f/4*body), features+f, 4, fg);
 		left = max(left, w);
 	}
 	left += 10;
 	
-	AsgPoint p = { left, heading };
-	asg_scale_font(font, body, 0);
-	float column = 18 * asg_get_char_width(font, 'M');
+	AgsPoint p = { left, heading };
+	ags_scale_font(font, body, 0);
+	float column = 18 * ags_get_char_width(font, 'M');
 	float max_height = heading;
 	float top = heading;
 	
@@ -369,25 +369,25 @@ void typography_test(const wchar_t *family) {
 		memcpy(feature,features+f,4);
 		feature[4] = 0;
 		
-		asg_scale_font(font, heading, 0);
-		asg_fill_string_utf8(gs, font, asg_pt(p.x, p.y - heading), feature, -1, fg);
-		asg_scale_font(font, body, 0);
+		ags_scale_font(font, heading, 0);
+		ags_fill_string_utf8(gs, font, ags_pt(p.x, p.y - heading), feature, -1, fg);
+		ags_scale_font(font, body, 0);
 		
-		asg_set_font_features(font, feature);
-		nsubstitutions = ((AsgOTF*)font)->nsubst;
+		ags_set_font_features(font, feature);
+		nsubstitutions = ((AgsOTF*)font)->nsubst;
 		for (int i = 0; i < nsubstitutions ; i++) {
-			substitutions[i][0] = ((AsgOTF*)font)->subst[i][0];
-			substitutions[i][1] = ((AsgOTF*)font)->subst[i][1];
+			substitutions[i][0] = ((AgsOTF*)font)->subst[i][0];
+			substitutions[i][1] = ((AgsOTF*)font)->subst[i][1];
 		}
-		asg_set_font_features(font, "");
+		ags_set_font_features(font, "");
 		
 		for (int i = 0; i < nsubstitutions; i++) {
-			float w = asg_fill_glyph(gs, font, p, substitutions[i][0], fg);
-			w += asg_fill_char(gs, font, asg_pt(p.x+w, p.y), ' ', fg);
-			w += asg_fill_glyph(gs, font, asg_pt(p.x+w, p.y), substitutions[i][1], fg);
+			float w = ags_fill_glyph(gs, font, p, substitutions[i][0], fg);
+			w += ags_fill_char(gs, font, ags_pt(p.x+w, p.y), ' ', fg);
+			w += ags_fill_glyph(gs, font, ags_pt(p.x+w, p.y), substitutions[i][1], fg);
 			char buf[128];
 			sprintf(buf, " %04x - %04x", substitutions[i][0] & 0xffff, substitutions[i][1] & 0xffff);
-			asg_fill_string_utf8(gs, font, asg_pt(p.x+w, p.y), buf, -1, fg2);
+			ags_fill_string_utf8(gs, font, ags_pt(p.x+w, p.y), buf, -1, fg2);
 			p.y += body;
 		}
 		
@@ -403,8 +403,8 @@ void typography_test(const wchar_t *family) {
 }
 
 void render() {
-    asg_clear(gs, bg);
-    asg_load_identity(gs);
+    ags_clear(gs, bg);
+    ags_load_identity(gs);
     
 //    simple_test();
 //    svg_test();
@@ -416,11 +416,11 @@ void render() {
 //		typography_test(L"RijksoverheidSansText");
 //    benchmark(); return false;
 
-//	AsgFont *font = asg_open_font_variant(L"Source Code Pro", 0,0,0);
+//	AgsFont *font = ags_open_font_variant(L"Source Code Pro", 0,0,0);
 //	if (!font) return;
-////	asg_fill_char(gs, font, asg_pt(0,0), '=', fg);
-//	AsgPath *path = asg_get_char_path(font, &gs->ctm, '=');
-//	asg_stroke_path(gs, path, fg);
+////	ags_fill_char(gs, font, ags_pt(0,0), '=', fg);
+//	AgsPath *path = ags_get_char_path(font, &gs->ctm, '=');
+//	ags_stroke_path(gs, path, fg);
 //
 
 }
@@ -438,6 +438,6 @@ int main() {
 	}
     
     int width = 1024, height = 800;
-    gs = asg_new(set_size(width, height), width, height);
+    gs = ags_new(set_size(width, height), width, height);
     display(width, height);
 }
