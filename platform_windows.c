@@ -83,7 +83,7 @@ void _pgScanDirectory(const wchar_t *dir, void perFile(const wchar_t *name, void
     }
 }
 
-static void hostFree(PgFont *font) {
+static void freeHost(PgFont *font) {
     freeFileMapping(font->host);
     free(font->host);
 }
@@ -139,10 +139,10 @@ PgFont *_pgOpenFontFile(const wchar_t *filename, int font_index, bool scan_only)
     Host *host = calloc(1, sizeof *host);
     void *data = loadFile(host, filename);
     if (data) {
-        PgFont *font = pgLoadFont(data, font_index, false);
+        PgFont *font = pgLoadFont(data, font_index, scan_only);
         if (font) {
             font->host = host;
-            font->host_free = hostFree;
+            font->freeHost = freeHost;
         }
         return font;
     } else {

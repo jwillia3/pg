@@ -1,5 +1,3 @@
-// TODO: Handle transformed coordinates in immediate mode drawing
-// TODO: provide interface for paths
 // TODO: decode Mac encodings for CJK names
 #define BEZIER_RECURSION_LIMIT 10
 #define _USE_MATH_DEFINES
@@ -28,13 +26,13 @@ static int clamp(int a, int b, int c) {
     return b <= a? a: b >= c? c: b;
 }
 static float dist(float x, float y) {
-    return sqrt(x*x + y*y);
+    return sqrtf(x*x + y*y);
 }
 static PgPt mid(PgPt a, PgPt b) {
     return pgPt((a.x + b.x) / 2, (a.y + b.y) / 2);
 }
 static float fraction(float x) {
-    return x - floor(x);
+    return x - floorf(x);
 }
 uint32_t pgBlend(uint32_t bg, uint32_t fg, uint32_t a) {
     if (a == 0xff)
@@ -99,8 +97,8 @@ void pgShearMatrix(PgMatrix *mat, float x, float y) {
 }
 void pgRotateMatrix(PgMatrix *mat, float rad) {
     PgMatrix old = *mat;
-    float m = cos(rad);
-    float n = sin(rad);
+    float m = cosf(rad);
+    float n = sinf(rad);
     mat->a = old.a * m - old.b * n;
     mat->b = old.a * n + old.b * m;
     mat->c = old.c * m - old.d * n;
@@ -144,280 +142,18 @@ PgPt pgTransformPoint(const PgMatrix *ctm, PgPt p) {
     };
     return out;
 }
-void pgClear(
-    const Pg *gs,
-    uint32_t color)
-{
+void pgClear(const Pg *gs, uint32_t color) {
     uint32_t *p = gs->buf;
     uint32_t *end = gs->buf + gs->width * gs->height;
     while (p < end) *p++ = color;
 }
-void pgStrokeLine(
-    const Pg *gs,
-    PgPt a,
-    PgPt b,
-    uint32_t color)
-{
-   int x0 = a.x;
-   int y0 = a.y;
-   int x1 = b.x;
-   int y1 = b.y;
-   
-   int dx = abs(x1-x0), sx = x0<x1 ? 1 : -1;
-   int dy = abs(y1-y0), sy = y0<y1 ? 1 : -1; 
-   int err = dx-dy, e2, x2;                       /* error value e_xy */
-   int ed = dx+dy == 0 ? 1 : sqrt((float)dx*dx+(float)dy*dy);
 
-   uint32_t *scr = gs->buf + y0 * gs->width + x0;
-   for ( ; ; ) {                                         /* pixel loop */
-      if (within(0, x0, gs->width) && within(0, y0, gs->height))
-        *scr = pgBlend(color, *scr, 255*abs(err-dx+dy)/ed);
-      e2 = err; x2 = x0;
-      if (2*e2 >= -dx) {                                    /* x step */
-         if (x0 == x1) break;
-         if (e2+dy < ed)
-            if (within(0, x0, gs->width) && within(0, y0+sy, gs->height)) {
-                uint32_t *tmp = scr + (sy > 0? gs->width: -gs->width);
-                *tmp = pgBlend(color, *tmp, 255*(e2+dy)/ed);
-            }
-         err -= dy; x0 += sx;
-         scr += sx;
-      } 
-      if (2*e2 <= dy) {                                     /* y step */
-         if (y0 == y1) break;
-         if (dx-e2 < ed)
-            if (within(0, x2+sx, gs->width) && within(0, y0, gs->height)) {
-                uint32_t *tmp = scr + (x2 - x0) + sx;
-                *tmp = pgBlend(color, *tmp, 255*(dx-e2)/ed);
-            }
-         err += dx; y0 += sy; 
-         scr += sy > 0? gs->width: -gs->width;
-      }
-    }
-}
-void pgStrokeRectangle(
-    const Pg *gs,
-    PgPt nw,
-    PgPt se,
-    uint32_t color)
-{
-    int x0 = clamp(0, nw.x, gs->width - 1);
-    int x1 = clamp(0, se.x, gs->width - 1);
-    int y0 = clamp(0, nw.y, gs->height - 1);
-    int y1 = clamp(0, se.y, gs->height - 1);
-    
-    int a = color >> 24;
-    uint32_t *screen = gs->buf + y0 * gs->width;
-    
-    if (within(0, nw.y, gs->height))
-        for (int x = x0; x <= x1; x++)
-            screen[x] = pgBlend(screen[x], color, a * (1 - fraction(nw.y)));
-    screen += gs->width;
-    if (within(0, nw.y + 1, gs->height))
-        for (int x = x0; x <= x1; x++)
-            screen[x] = pgBlend(screen[x], color, a * fraction(nw.y));
-    
-    
-    for (int y = y0; y <= y1; y++, screen += gs->width) {
-        if (within(0, nw.x, gs->width))
-            screen[x0] = pgBlend(screen[x0], color, a * (1 - fraction(nw.x)));
-        if (within(0, nw.x+1, gs->width))
-            screen[x0+1] = pgBlend(screen[x0+1], color, a * fraction(nw.x));
-        if (within(0, se.x, gs->width))
-            screen[x1] = pgBlend(screen[x1], color, a * (1 - fraction(se.x)));
-        if (within(0, se.x-1, gs->width))
-            screen[x1-1] = pgBlend(screen[x1-1], color, a * fraction(se.x));
-    }
-    
-    screen -= gs->width;
-    if (within(0, se.y, gs->height))
-        for (int x = x0; x <= x1; x++)
-            screen[x] = pgBlend(screen[x], color, a * (1 - fraction(se.y)));
-    screen += gs->width;
-    if (within(0, se.y + 1, gs->height))
-        for (int x = x0; x <= x1; x++)
-            screen[x] = pgBlend(screen[x], color, a * fraction(se.y));
-}
-
-void pgFillRectangle(
-    const Pg *gs,
-    PgPt nw,
-    PgPt se,
-    uint32_t color)
-{
-    int x0 = clamp(0, nw.x, gs->width - 1);
-    int x1 = clamp(0, se.x, gs->width - 1);
-    int y0 = clamp(0, nw.y, gs->height - 1);
-    int y1 = clamp(0, se.y, gs->height - 1);
-    
-    int a = color >> 24;
-    uint32_t *screen = gs->buf + y0 * gs->width;
-    
-    if (within(0, nw.y, gs->height))
-        for (int x = x0; x <= x1; x++)
-            screen[x] = pgBlend(screen[x], color, a * (1 - fraction(nw.y)));
-    screen += gs->width;
-    for (int y = y0; y < y1; y++, screen += gs->width) {
-        if (within(0, nw.x, gs->width))
-            screen[x0] = pgBlend(screen[x0], color, a * (1 - fraction(nw.x)));
-        for (int x = x0 + 1; x < x1; x++)
-            screen[x] = pgBlend(screen[x], color, a);
-        if (within(0, se.x-1, gs->width))
-            screen[x1-1] = pgBlend(screen[x1-1], color, a * fraction(se.x));
-    }
-    if (within(0, se.y, gs->height))
-        for (int x = x0; x <= x1; x++)
-            screen[x] = pgBlend(screen[x], color, a * fraction(se.y));
-}
-
-void pgStrokeCircle(
-    const Pg *gs,
-    PgPt centre,
-    float radius,
-    uint32_t color)
-{
-    int x = -radius, y = 0, e = 2 - 2 * radius;
-    int cx = centre.x;
-    int cy = centre.y;
-    uint32_t *screen = gs->buf + cy * gs->width + cx;
-    do {
-        if (within(0, cx - x, gs->width) && within(0, cy + y, gs->height))
-            screen[-x + y*gs->width] = color;
-        if (within(0, cx - y, gs->width) && within(0, cy - x, gs->height))
-            screen[-y - x*gs->width] = color;
-        if (within(0, cx + x, gs->width) && within(0, cy - y, gs->height))
-            screen[x - y*gs->width] = color;
-        if (within(0, cx + y, gs->width) && within(0, cy + x, gs->height))
-            screen[y + x*gs->width] = color;
-        radius = e;
-        if (radius <= y) {
-            y++;
-            e += y * 2 + 1;
-        }
-        if (radius > x || e > y) {
-            x++;
-            e += x * 2 + 1;
-        }
-    } while (x < 0);
-}
-void pgFillCircle(
-    const Pg *gs,
-    PgPt centre,
-    float radius,
-    uint32_t color)
-{
-    // TODO Use a real circle algorithm
-    int cx = centre.x;
-    int cy = centre.y;
-    int min_y = clamp(0, centre.y - radius, gs->height - 1);
-    int max_y = clamp(0, centre.y + radius, gs->height - 1);
-    uint32_t *screen = gs->buf + min_y * gs->width;
-    for (int y = min_y; y < max_y; y++) {
-        int min_x = clamp(0, centre.x - radius, gs->width - 1);
-        int max_x = clamp(0, centre.x + radius, gs->width - 1);
-        bool first = false;
-        
-        for (int x = min_x; x < max_x; x++) {
-            float dx = (cx - x);
-            float dy = (cy - y);
-            float d = sqrt(dx*dx + dy*dy);
-            if (d < radius)
-                if (within(0,x,gs->width) && within(0,y,gs->height)) {
-                    if (!first) {
-                        screen[x] = pgBlend(screen[x],
-                            color,
-                            (color >> 24) * (1 - fraction(centre.x - radius)));
-                        first = true;
-                    } else
-                        screen[x] = pgBlend(screen[x], color, color >> 24);
-                }
-        }
-        if (max_x == centre.x + radius)
-            screen[max_x] = pgBlend(screen[max_x],
-                color,
-                (color >> 24) * fraction(centre.x + radius));
-        screen += gs->width;
-    }
-}
-
-static void stroke_bezier3(
-    const Pg *gs,
-    PgPt a,
-    PgPt b,
-    PgPt c,
-    uint32_t color,
-    int n)
-{
-    // TODO Make quadratic and cubic agree on what flatness is
-    if (!n) {
-        pgStrokeLine(gs, a, c, color);
-        return;
-    }
-    PgPt m = { (a.x + 2 * b.x + c.x) / 4, (a.y + 2 * b.y + c.y) / 4 };
-    PgPt d = { (a.x + c.x) / 2 - m.x, (a.y + c.y) / 2 - m.y };
-    if (d.x * d.x + d.y * d.y > .05) {
-        stroke_bezier3(gs, a, pgPt((a.x + b.x) / 2, (a.y + b.y) / 2), m, color, n - 1);
-        stroke_bezier3(gs, m, pgPt((b.x + c.x) / 2, (b.y + c.y) / 2), c, color, n - 1);
-    } else
-        pgStrokeLine(gs, a, c, color);
-}
-
-void psStrokeQuadratic(
-    const Pg *gs,
-    PgPt a,
-    PgPt b,
-    PgPt c,
-    uint32_t color)
-{
-    stroke_bezier3(gs, a, b, c, color, BEZIER_RECURSION_LIMIT);
-}
-static void stroke_bezier4(
-    const Pg *gs,
-    PgPt a,
-    PgPt b,
-    PgPt c,
-    PgPt d,
-    uint32_t color,
-    int n)
-{
-    if (!n) {
-        pgStrokeLine(gs, a, d, color);
-        return;
-    }
-    float d1 = dist(a.x - b.x, a.y - b.y);
-    float d2 = dist(b.x - c.x, b.y - c.y);
-    float d3 = dist(c.x - d.x, c.y - d.y);
-    float d4 = dist(a.x - d.x, a.y - d.y);
-    if (d1 + d2 + d3 < gs->flatness * d4)
-        pgStrokeLine(gs, a, d, color);
-    else {
-        PgPt mab = mid(a, b);
-        PgPt mbc = mid(b, c);
-        PgPt mcd = mid(c, d);
-        PgPt mabc = mid(mab, mbc);
-        PgPt mbcd = mid(mbc, mcd);
-        PgPt mabcd = mid(mabc, mbcd);
-        stroke_bezier4(gs, a, mab, mabc, mabcd, color, n - 1);
-        stroke_bezier4(gs, mabcd, mbcd, mcd, d, color, n - 1);
-    }
-}
-void psStrokeCubic(
-    const Pg *gs,
-    PgPt a,
-    PgPt b,
-    PgPt c,
-    PgPt d,
-    uint32_t color)
-{
-    stroke_bezier4(gs, a, b, c, d, color, BEZIER_RECURSION_LIMIT);
-}
-
-PgPath *pgNew_path(void) {
+PgPath *pgNewPath(void) {
     PgPath *path = calloc(1, sizeof *path);
     return path;
 }
 
-void pgFree_path(PgPath *path) {
+void pgFreePath(PgPath *path) {
     if (path) {
         free(path->types);
         free(path->points);
@@ -425,12 +161,7 @@ void pgFree_path(PgPath *path) {
     }
 }
 
-static void add_part(
-    PgPath *path,
-    const PgMatrix *ctm,
-    PgPathPartType type,
-    ...)
-{
+static void addPart(PgPath *path, const PgMatrix *ctm, PgPathPartType type, ...) {
     if (path->nparts + 1 >= path->cap) {
         path->cap = path->cap? path->cap * 2: 16;
         path->types = realloc(path->types, path->cap * sizeof *path->types);
@@ -447,67 +178,22 @@ static void add_part(
     path->npoints += pgPathPartTypeArgs(type);
 }
 
-void pgSubpath(
-    PgPath *path,
-    const PgMatrix *ctm,
-    PgPt p)
-{
+void pgSubpath(PgPath *path, const PgMatrix *ctm, PgPt p) {
     path->start = pgTransformPoint(ctm, p);
-    add_part(path, ctm, PG_PATH_SUBPATH, &p);
+    addPart(path, ctm, PG_PATH_SUBPATH, &p);
 }
 
 void pgClosePath(PgPath *path) {
-    add_part(path, &PgIdentityMatrix, PG_PATH_LINE, &path->start);
+    addPart(path, &PgIdentityMatrix, PG_PATH_LINE, &path->start);
 }
-void pgLine(
-    PgPath *path,
-    const PgMatrix *ctm,
-    PgPt b)
-{
-    add_part(path, ctm, PG_PATH_LINE, &b);
+void pgLine(PgPath *path, const PgMatrix *ctm, PgPt b) {
+    addPart(path, ctm, PG_PATH_LINE, &b);
 }
-void pgQuadratic(
-    PgPath *path,
-    const PgMatrix *ctm,
-    PgPt b,
-    PgPt c)
-{
-    add_part(path, ctm, PG_PATH_BEZIER3, &b, &c);
+void pgQuadratic(PgPath *path, const PgMatrix *ctm, PgPt b, PgPt c) {
+    addPart(path, ctm, PG_PATH_BEZIER3, &b, &c);
 }
-void pgCubic(
-    PgPath *path,
-    const PgMatrix *ctm,
-    PgPt b,
-    PgPt c,
-    PgPt d)
-{
-    add_part(path, ctm, PG_PATH_BEZIER4, &b, &c, &d);
-}
-
-void pgStroke(
-    const Pg *gs,
-    const PgPath *path,
-    uint32_t color)
-{    
-    PgPt a = {0, 0};
-    for (int i = 0, ip = 0; i < path->nparts; ip += pgPathPartTypeArgs(path->types[i]), i++)
-        switch (path->types[i]) {
-        case PG_PATH_SUBPATH:
-            a = path->points[ip];
-            break;
-        case PG_PATH_LINE:
-            pgStrokeLine(gs, a, path->points[ip], color);
-            a = path->points[ip];
-            break;
-        case PG_PATH_BEZIER3:
-            psStrokeQuadratic(gs, a, path->points[ip], path->points[ip+1], color);
-            a = path->points[ip+1];
-            break;
-        case PG_PATH_BEZIER4:
-            psStrokeCubic(gs, a, path->points[ip], path->points[ip+1], path->points[ip+2], color);
-            a = path->points[ip+2];
-            break;
-        }
+void pgCubic(PgPath *path, const PgMatrix *ctm, PgPt b, PgPt c, PgPt d) {
+    addPart(path, ctm, PG_PATH_BEZIER4, &b, &c, &d);
 }
 
 PgRect pgGetBoundingBox(PgPath *path) {
@@ -535,11 +221,7 @@ typedef struct {
 } SegList;
 
 
-static void add_seg(
-    SegList *list,
-    PgPt a,
-    PgPt b)
-{
+static void addSeg(SegList *list, PgPt a, PgPt b) {
     if (list->n + 1 >= list->cap) {
         list->cap = list->cap? list->cap * 2: 128;
         list->segs = realloc(list->segs, list->cap * sizeof *list->segs);
@@ -549,37 +231,22 @@ static void add_seg(
     list->segs[list->n].dir = a.y < b.y? -1: 1;
     list->n++;
 }
-static void decomp_bezier3(
-    SegList *list,
-    PgPt a,
-    PgPt b,
-    PgPt c,
-    float flatness,
-    int n)
-{    
+static void decompQuad(SegList *list, PgPt a, PgPt b, PgPt c, float flatness, int n) {    
     if (!n) {
-        add_seg(list, a, c);
+        addSeg(list, a, c);
         return;
     }
     PgPt m = { (a.x + 2 * b.x + c.x) / 4, (a.y + 2 * b.y + c.y) / 4 };
     PgPt d = { (a.x + c.x) / 2 - m.x, (a.y + c.y) / 2 - m.y };
     if (d.x * d.x + d.y * d.y > .05) {
-        decomp_bezier3(list, a, pgPt((a.x + b.x) / 2, (a.y + b.y) / 2), m, flatness, n - 1);
-        decomp_bezier3(list, m, pgPt((b.x + c.x) / 2, (b.y + c.y) / 2), c, flatness, n - 1);
+        decompQuad(list, a, pgPt((a.x + b.x) / 2, (a.y + b.y) / 2), m, flatness, n - 1);
+        decompQuad(list, m, pgPt((b.x + c.x) / 2, (b.y + c.y) / 2), c, flatness, n - 1);
     } else
-        add_seg(list, a, c);
+        addSeg(list, a, c);
 }
-static void decomp_bezier4(
-    SegList *list,
-    PgPt a,
-    PgPt b,
-    PgPt c,
-    PgPt d,
-    float flatness,
-    int n)
-{    
+static void decompCubic(SegList *list, PgPt a, PgPt b, PgPt c, PgPt d, float flatness, int n) {    
     if (!n) {
-        add_seg(list, a, d);
+        addSeg(list, a, d);
         return;
     }
     float d1 = dist(a.x - b.x, a.y - b.y);
@@ -593,12 +260,12 @@ static void decomp_bezier4(
         PgPt mabc = mid(mab, mbc);
         PgPt mbcd = mid(mbc, mcd);
         PgPt mabcd = mid(mabc, mbcd);
-        decomp_bezier4(list, a, mab, mabc, mabcd, flatness, n - 1);
-        decomp_bezier4(list, mabcd, mbcd, mcd, d, flatness, n - 1);
+        decompCubic(list, a, mab, mabc, mabcd, flatness, n - 1);
+        decompCubic(list, mabcd, mbcd, mcd, d, flatness, n - 1);
     } else
-        add_seg(list, a, d);
+        addSeg(list, a, d);
 }
-static int sort_tops(const void *ap, const void *bp) {
+static int sortTops(const void *ap, const void *bp) {
     const Segment * __restrict a = ap;
     const Segment * __restrict b = bp;
     return  a->a.y < b->a.y? -1:
@@ -607,7 +274,7 @@ static int sort_tops(const void *ap, const void *bp) {
             a->a.x > b->a.x? 1:
             0;
 }
-static void fill_evenodd(const Pg *gs, const Segment *segs, int nsegs, uint32_t color) {
+static void fill(const Pg *gs, const Segment *segs, int nsegs, uint32_t color) {
     typedef struct {
         float y0;
         float y1;
@@ -742,16 +409,8 @@ static void fill_evenodd(const Pg *gs, const Segment *segs, int nsegs, uint32_t 
     free(buffer);
     free(edges);
 }
-static void fill_nonzero(const Pg *gs, const Segment *segs, int nsegs, uint32_t color) {
-    // TODO Do even-odd fill rule
-    fill_evenodd(gs, segs, nsegs, color);
-}
 
-void pgFill(
-    const Pg *gs,
-    const PgPath *path,
-    uint32_t color)
-{
+void pgFill(const Pg *gs, const PgPath *path, uint32_t color) {
     if (path->nparts == 0) return;
     
     SegList list = { 0 };
@@ -764,15 +423,15 @@ void pgFill(
             a = path->points[ip];
             break;
         case PG_PATH_LINE:
-            add_seg(&list, a, path->points[ip]);
+            addSeg(&list, a, path->points[ip]);
             a = path->points[ip];
             break;
         case PG_PATH_BEZIER3:
-            decomp_bezier3(&list, a, path->points[ip], path->points[ip+1], gs->flatness, BEZIER_RECURSION_LIMIT);
+            decompQuad(&list, a, path->points[ip], path->points[ip+1], gs->flatness, BEZIER_RECURSION_LIMIT);
             a = path->points[ip+1];
             break;
         case PG_PATH_BEZIER4:
-            decomp_bezier4(&list, a, path->points[ip], path->points[ip+1], path->points[ip+2], gs->flatness, BEZIER_RECURSION_LIMIT);
+            decompCubic(&list, a, path->points[ip], path->points[ip+1], path->points[ip+2], gs->flatness, BEZIER_RECURSION_LIMIT);
             a = path->points[ip+2];
             break;
         }
@@ -789,13 +448,9 @@ void pgFill(
     // Sort line segments by their tops
     const Segment *const __restrict segs = list.segs;
     const int nsegs = list.n;
-    qsort(list.segs, nsegs, sizeof *segs, sort_tops);
+    qsort(list.segs, nsegs, sizeof *segs, sortTops);
     
-    if (path->fill_rule == PG_EVENODD_WINDING)
-        fill_evenodd(gs, segs, nsegs, color);
-    else
-        fill_nonzero(gs, segs, nsegs, color);
-    
+    fill(gs, segs, nsegs, color);
     free(list.segs);
 }
 
@@ -879,7 +534,7 @@ uint8_t *pgUtf16To8(const uint16_t *input, int len, int *lenp) {
     return realloc(output, len + 1);
 }
 
-static void scan_fonts_per_file(const wchar_t *filename, void *data) {
+static void scanFontsPerFile(const wchar_t *filename, void *data) {
     int nfonts = 1;
     for (int index = 0; index < nfonts; index++) {
         PgFont *font = pgLoadFont(data, index, true);
@@ -888,7 +543,7 @@ static void scan_fonts_per_file(const wchar_t *filename, void *data) {
         
         
         const wchar_t *family = pgGetFontFamily(font);
-        int i, dir;
+        int i, dir = 0;
         
         for (i = 0; i < NFamilies; i++) {
             dir = wcsicmp(family, Families[i].name);
@@ -916,16 +571,16 @@ static void scan_fonts_per_file(const wchar_t *filename, void *data) {
                 free((void*)*slot);
             *slot = wcsdup(filename);
             if (pgIsFontItalic(font))
-                Families[i].italic_index[weight] = index;
+                Families[i].italicIndex[weight] = index;
             else
-                Families[i].roman_index[weight] = index;
+                Families[i].romanIndex[weight] = index;
         }
 
-        pgFree_font(font);
+        pgFreeFont(font);
     }
 }
 
-void pgFree_font_family(PgFontFamily *family) {
+void pgFreeFontFamily(PgFontFamily *family) {
     if (family) {
         free((void*)family->name);
         for (int i = 0; i < 10; i++) {
@@ -934,30 +589,30 @@ void pgFree_font_family(PgFontFamily *family) {
         }
     }
 }
-static PgFontFamily copy_font_family(PgFontFamily *src) {
+static PgFontFamily copyFontFamily(PgFontFamily *src) {
     PgFontFamily out;
     
     out.name = wcsdup(src->name);
     for (int i = 0; i < 10; i++) {
         out.roman[i] = src->roman[i];
         out.italic[i] = src->italic[i];
-        out.roman_index[i] = src->roman_index[i];
-        out.italic_index[i] = src->italic_index[i];
+        out.romanIndex[i] = src->romanIndex[i];
+        out.italicIndex[i] = src->italicIndex[i];
     }
     return out;
 }
 
 PgFontFamily *pgScanFonts(const wchar_t *dir, int *countp) {
 //    for (int i = 0; i < NFamilies; i++)
-//        pgFree_font_family(&Families[i]);
+//        pgFreeFontFamily(&Families[i]);
     Families = NULL;
     NFamilies = 0;
-    _pgScanDirectory(dir, scan_fonts_per_file);
+    _pgScanDirectory(dir, scanFontsPerFile);
     
     // Copy families
     PgFontFamily *families = malloc(NFamilies * sizeof *families);
     for (int i = 0; i < NFamilies; i++) 
-        families[i] = copy_font_family(&Families[i]);
+        families[i] = copyFontFamily(&Families[i]);
     
     if (countp) *countp = NFamilies;
     return families;
@@ -1101,7 +756,7 @@ collection_item:
                     if (id == 1)
                         font->family = output;
                     else if (id == 2)
-                        font->style_name = output;
+                        font->styleName = output;
                     else if (id == 4)
                         font->name = output;
                     else if (id == 16) { // Preferred font family
@@ -1122,7 +777,7 @@ collection_item:
                     if (id == 1)
                         font->family = output;
                     else if (id == 2)
-                        font->style_name = output;
+                        font->styleName = output;
                     else if (id == 4)
                         font->name = output;
                     else if (id == 16) { // Preferred font family
@@ -1132,7 +787,7 @@ collection_item:
                 }
         }
         if (!font->family) font->family = wcsdup(L"");
-        if (!font->style_name) font->style_name = wcsdup(L"");
+        if (!font->styleName) font->styleName = wcsdup(L"");
         if (!font->name) font->name = wcsdup(L"");
     }
     
@@ -1195,74 +850,73 @@ collection_item:
     font->nfonts = nfonts;
     return font;
 }
-int pgGetOpenTypeFontCount(PgOpenType*font) {
+int pgGetOpenTypeFontCount(PgOpenType *font) {
     return font? font->nfonts: 0;
 }
 
-void pgFree_otf(PgOpenType *font) {
+static void freeOpenType(PgOpenType *font) {
     if (font) {
         free((void*)font->family);
-        free((void*)font->style_name);
+        free((void*)font->styleName);
         free((void*)font->name);
         free(font->features);
         free(font->subst);
         free(font);
     }
 }
-void pgScale_otf(PgOpenType *font, float height, float width) {
-    float s = font->ascender - font->descender;
+static void scaleOpenType(PgOpenType *font, float height, float width) {
     if (width <= 0)
         width = height;
     font->scale_x = width / font->em;
     font->scale_y = height / font->em;
 }
 
-float getOpenTypeAscender(const PgOpenType *font) {
+static float getOpenTypeAscender(const PgOpenType *font) {
     return font->ascender * font->scale_y;
 }
-float getOpenTypeDescender(const PgOpenType *font) {
+static float getOpenTypeDescender(const PgOpenType *font) {
     return font->descender * font->scale_y;
 }
-float getOpenTypeLeading(const PgOpenType *font) {
+static float getOpenTypeLeading(const PgOpenType *font) {
     return font->leading * font->scale_y;
 }
-float getOpenTypeEm(const PgOpenType *font) {
+static float getOpenTypeEm(const PgOpenType *font) {
     return font->em * font->scale_y;
 }
-float pgGetOpenTypeXHeight(const PgOpenType *font) {
+static float getOpenTypeXHeight(const PgOpenType *font) {
     return font->x_height * font->scale_y;
 }
-float pgGetOpenTypeCapHeight(const PgOpenType *font) {
+static float getOpenTypeCapHeight(const PgOpenType *font) {
     return font->cap_height * font->scale_y;
 }
-PgFontWeight getOpenTypeWeight(const PgOpenType *font) {
+static PgFontWeight getOpenTypeWeight(const PgOpenType *font) {
     return font->weight;
 }
-PgFontStretch getOpenTypeStretch(const PgOpenType *font) {
+static PgFontStretch getOpenTypeStretch(const PgOpenType *font) {
     return font->stretch;
 }
-PgRect getOpenTypeSubscript(const PgOpenType *font) {
+static PgRect getOpenTypeSubscript(const PgOpenType *font) {
     return font->superscript_box;
 }
-PgRect getOpenTypeSuperscript(const PgOpenType *font) {
+static PgRect getOpenTypeSuperscript(const PgOpenType *font) {
     return font->superscript_box;
 }
-bool isOpenTypeMonospaced(const PgOpenType *font) {
+static bool isOpenTypeMonospaced(const PgOpenType *font) {
     return font->panose[3] == 9; // PANOSE porportion = 9 (monospaced)
 }
-bool isOpenTypeItalic(const PgOpenType *font) {
+static bool isOpenTypeItalic(const PgOpenType *font) {
     return font->is_italic;
 }
-const wchar_t *getOpenTypeFamily(const PgOpenType *font) {
+static const wchar_t *getOpenTypeFamily(const PgOpenType *font) {
     return font->family;
 }
-const wchar_t *getOpenTypeName(const PgOpenType *font) {
+static const wchar_t *getOpenTypeName(const PgOpenType *font) {
     return font->name;
 }
-const wchar_t *getOpenTypeStyleName(const PgOpenType *font) {
-    return font->style_name;
+static const wchar_t *getOpenTypeStyleName(const PgOpenType *font) {
+    return font->styleName;
 }
-static char *lookup_otf_features(
+static char *lookupOpenTypeFeatures(
     PgOpenType *font,
     const uint8_t *table,
     uint32_t script,
@@ -1389,6 +1043,12 @@ static char *lookup_otf_features(
     }
     return all_features;
 }
+static void substituteOpenTypeGlyph(PgOpenType *font, uint16_t in, uint16_t out) {
+    font->subst = realloc(font->subst, (font->nsubst + 1) * 2 * sizeof *font->subst);
+    font->subst[font->nsubst][0] = in;
+    font->subst[font->nsubst][1] = out;
+    font->nsubst++;
+}
 static void gsub_handler(PgOpenType *font, uint32_t tag, const uint8_t *subtable_base, int lookup_type) {
     const uint8_t *subtable = subtable_base;
     uint16_t subst_format, coverage_offset;
@@ -1418,7 +1078,7 @@ redo_subtable:
                     uint16_t input;
                     unpack(&coverage, "S", &input);
                     uint16_t output = input + delta;
-                    pgSubstituteOpenTypeGlyph(font, input, output);
+                    substituteOpenTypeGlyph(font, input, output);
                 }
             else if (coverage_format == 2)
                 for (int i = 0; i < count; i++) {
@@ -1427,7 +1087,7 @@ redo_subtable:
                     for (int glyph = start; glyph <= end; glyph++) {
                         uint16_t input = glyph;
                         uint16_t output = input + delta;
-                        pgSubstituteOpenTypeGlyph(font, input, output);
+                        substituteOpenTypeGlyph(font, input, output);
                     }
                 }
         }
@@ -1441,7 +1101,7 @@ redo_subtable:
                     uint16_t output;
                     unpack(&coverage, "S", &input);
                     unpack(&subtable, "S", &output);
-                    pgSubstituteOpenTypeGlyph(font, input, output);
+                    substituteOpenTypeGlyph(font, input, output);
                 }
             else if (coverage_format == 2)
                 for (int i = 0; i < count; i++) {
@@ -1451,44 +1111,37 @@ redo_subtable:
                         uint16_t output;
                         uint16_t input = glyph;
                         unpack(&subtable, "S", &output);
-                        pgSubstituteOpenTypeGlyph(font, input, output);
+                        substituteOpenTypeGlyph(font, input, output);
                     }
                 }
         }
     }
 }
-char *pgGetOpenTypeFontFeatures(const PgOpenType *font) {
-    return lookup_otf_features((PgOpenType*)font, font->gsub, 'latn', 'eng ', "", NULL);
+static char *getOpenTypeFontFeatures(const PgOpenType *font) {
+    return lookupOpenTypeFeatures((PgOpenType*)font, font->gsub, 'latn', 'eng ', "", NULL);
 }
 
-void pgSetOpenTypeFontFeatures(PgOpenType *font, const uint8_t *features) {
+static void setOpenTypeFontFeatures(PgOpenType *font, const uint8_t *features) {
     free(font->features);
     free(font->subst);
     font->nsubst = 0;
     font->subst = NULL;
     font->features = (void*)strdup(features);
     if (*features)
-        lookup_otf_features(font, font->gsub, font->script, font->lang, features, gsub_handler);
-}
-void pgSubstituteOpenTypeGlyph(PgOpenType *font, uint16_t in, uint16_t out) {
-    font->subst = realloc(font->subst, (font->nsubst + 1) * 2 * sizeof *font->subst);
-    font->subst[font->nsubst][0] = in;
-    font->subst[font->nsubst][1] = out;
-    font->nsubst++;
+        lookupOpenTypeFeatures(font, font->gsub, font->script, font->lang, features, gsub_handler);
 }
 
-float getOpenTypeGlyph_lsb(const PgOpenType *font, unsigned g) {
+static float getOpenTypeGlyphLsb(const PgOpenType *font, unsigned g) {
     return  g < font->nhmtx?    be16(font->hmtx[g * 2 + 1]) * font->scale_x:
             g < font->nglyphs?  be16(font->hmtx[(font->nhmtx - 1) * 2 + 1]) * font->scale_x:
             0;
 }
-float getOpenTypeGlyph_width(const PgOpenType *font, unsigned g) {
+static float getOpenTypeGlyphWidth(const PgOpenType *font, unsigned g) {
     return  g < font->nhmtx?    be16(font->hmtx[g * 2]) * font->scale_x:
             g < font->nglyphs?  be16(font->hmtx[(font->nhmtx - 1) * 2]) * font->scale_x:
             0;
 }
-
-static void glyph_path(PgPath *path, const PgOpenType *font, const PgMatrix *ctm, unsigned g) {
+static void glyphPath(PgPath *path, const PgOpenType *font, const PgMatrix *ctm, unsigned g) {
     if (g >= font->nglyphs)
         g = 0;
     const void          *data;
@@ -1543,7 +1196,7 @@ static void glyph_path(PgPath *path, const PgOpenType *font, const PgMatrix *ctm
             
             pgScaleMatrix(&new_ctm, sx, sy);
             pgMultiplyMatrix(&new_ctm, ctm);
-            glyph_path(path, font, &new_ctm, glyph);
+            glyphPath(path, font, &new_ctm, glyph);
         } while (flags & 32);
     } else {
         const uint16_t  *ends = data;
@@ -1571,7 +1224,6 @@ static void glyph_path(PgPath *path, const PgOpenType *font, const PgMatrix *ctm
         PgPt a = {0, 0};
         PgPt b;
         bool in_curve = false;
-        
         
         int vx = 0;
         int vy = 0;
@@ -1632,27 +1284,27 @@ static void glyph_path(PgPath *path, const PgOpenType *font, const PgMatrix *ctm
             pgClosePath(path);
     }
 }
-PgPath *getOpenTypeGlyphPath(
+static PgPath *getOpenTypeGlyphPath(
     const PgOpenType *font,
     const PgMatrix *ctm,
     unsigned g)
 {
-    PgPath *path = pgNew_path();
+    PgPath *path = pgNewPath();
     PgMatrix new_ctm = {1,0,0, 1,0,0};
     pgTranslateMatrix(&new_ctm, 0, -font->ascender);
     pgScaleMatrix(&new_ctm, font->scale_x, -font->scale_y);
     pgMultiplyMatrix(&new_ctm, ctm);
-    glyph_path(path, font, &new_ctm, g);
+    glyphPath(path, font, &new_ctm, g);
     return path;
 }
-float ags_otf_fill_glyph(
+static float fillOpenTypeGlyph(
     Pg *gs,
     const PgOpenType *font,
     PgPt at,
     unsigned g,
     uint32_t color)
 {
-    float width = getOpenTypeGlyph_width(font, g);
+    float width = getOpenTypeGlyphWidth(font, g);
     float em = getOpenTypeEm(font);
     if (!within(-em, at.x, gs->width+em) || !within(-em, at.y, gs->height+em))
         return width;
@@ -1662,38 +1314,52 @@ float ags_otf_fill_glyph(
     PgPath *path = getOpenTypeGlyphPath(font, &ctm, g);
     if (path) {
         pgFill(gs, path, color);
-        pgFree_path(path);
+        pgFreePath(path);
     }
     return width;
 }
 
-unsigned getOpenTypeGlyph(const PgOpenType *font, unsigned c) {
+static unsigned getOpenTypeGlyph(const PgOpenType *font, unsigned c) {
     unsigned g = font->cmap[c & 0xffff];
     for (int i = 0; i < font->nsubst; i++)
         if (g == font->subst[i][0])
             g = font->subst[i][1];
     return g;
 }
-float getOpenTypeCharLsb(const PgOpenType *font, unsigned c) {
-    return getOpenTypeGlyph_lsb(font, getOpenTypeGlyph(font, c));
+static float getOpenTypeCharLsb(const PgOpenType *font, unsigned c) {
+    return getOpenTypeGlyphLsb(font, getOpenTypeGlyph(font, c));
 }
-float getOpenTypeCharWidth(const PgOpenType *font, unsigned c) {
-    return getOpenTypeGlyph_width(font, getOpenTypeGlyph(font, c));
+static float getOpenTypeCharWidth(const PgOpenType *font, unsigned c) {
+    return getOpenTypeGlyphWidth(font, getOpenTypeGlyph(font, c));
 }
-PgPath *ags_get_otf_char_path(const PgOpenType *font, const PgMatrix *ctm, unsigned c) {
+static PgPath *getOpenTypeCharPath(const PgOpenType *font, const PgMatrix *ctm, unsigned c) {
     return getOpenTypeGlyphPath(font, ctm, getOpenTypeGlyph(font, c));
 }
-float ags_otf_fill_char(
+static float fillOpenTypeChar(
     Pg *gs,
     const PgOpenType *font,
     PgPt at,
     unsigned c,
     uint32_t color)
 {
-    return ags_otf_fill_glyph(gs, font, at, getOpenTypeGlyph(font, c), color);
+    return fillOpenTypeGlyph(gs, font, at, getOpenTypeGlyph(font, c), color);
 }
 
-float fillOpenTypeString_utf8(
+static float fillOpenTypeString(
+    Pg *gs,
+    const PgOpenType *font,
+    PgPt at,
+    const uint16_t chars[],
+    int len,
+    uint32_t color)
+{
+    float org = at.x;
+    if (len < 0) len = wcslen(chars);
+    for (int i = 0; i < len; i++)
+        at.x += fillOpenTypeGlyph(gs, font, at, getOpenTypeGlyph(font, chars[i]), color);
+    return at.x - org;
+}
+static float fillOpenTypeStringUtf8(
     Pg *gs,
     const PgOpenType *font,
     PgPt at,
@@ -1705,20 +1371,6 @@ float fillOpenTypeString_utf8(
     float width = fillOpenTypeString(gs, font, at, wchars, len, color);
     free(wchars);
     return width;
-}
-float fillOpenTypeString(
-    Pg *gs,
-    const PgOpenType *font,
-    PgPt at,
-    const uint16_t chars[],
-    int len,
-    uint32_t color)
-{
-    float org = at.x;
-    if (len < 0) len = wcslen(chars);
-    for (int i = 0; i < len; i++)
-        at.x += ags_otf_fill_glyph(gs, font, at, getOpenTypeGlyph(font, chars[i]), color);
-    return at.x - org;
 }
 
 PgFont *pgOpenFontFile(const wchar_t *filename, int font_index, bool scan_only) {
@@ -1737,7 +1389,7 @@ PgFont *pgOpenFont(const wchar_t *family, PgFontWeight weight, bool italic, PgFo
                 break;
         
         if (f != NFamilies) {
-            uint8_t *index = italic? Families[f].italic_index: Families[f].roman_index;
+            uint8_t *index = italic? Families[f].italicIndex: Families[f].romanIndex;
             const wchar_t **filename = italic? Families[f].italic: Families[f].roman;
             
             if (filename[weight/100])
@@ -1752,10 +1404,10 @@ PgFont *pgOpenFont(const wchar_t *family, PgFontWeight weight, bool italic, PgFo
 }
 
 void pgSetFontFeatures(PgFont *font, const uint8_t *features) {
-    pgSetOpenTypeFontFeatures((void*)font, features);
+    setOpenTypeFontFeatures((void*)font, features);
 }
-void ags_substitute_glyph(PgFont *font, uint16_t in, uint16_t out) {
-    pgSubstituteOpenTypeGlyph((void*)font, in, out);
+void pgSubstituteGlyph(PgFont *font, uint16_t in, uint16_t out) {
+    substituteOpenTypeGlyph((void*)font, in, out);
 }
 
 PgFont *pgLoadFont(const void *file, int font_index, bool scan_only) {
@@ -1764,15 +1416,15 @@ PgFont *pgLoadFont(const void *file, int font_index, bool scan_only) {
 int pgGetFontCount(PgFont *font) {
     return pgGetOpenTypeFontCount((void*)font);
 }
-void pgFree_font(PgFont *font) {
+void pgFreeFont(PgFont *font) {
     if (font) {
-        if (font->host_free)
-            font->host_free(font);
-        pgFree_otf((void*)font);
+        if (font->freeHost)
+            font->freeHost(font);
+        freeOpenType((void*)font);
     }
 }
-void pgScale_font(PgFont *font, float height, float width) {
-    pgScale_otf((void*)font, height, width);
+void pgScaleFont(PgFont *font, float height, float width) {
+    scaleOpenType((void*)font, height, width);
 }
 float pgGetFontAscender(const PgFont *font) {
     return getOpenTypeAscender((void*)font);
@@ -1787,10 +1439,10 @@ float pgGetFontEm(const PgFont *font) {
     return getOpenTypeEm((void*)font);
 }
 float pgGetFontXHeight(const PgFont *font) {
-    return pgGetOpenTypeXHeight((void*)font);
+    return getOpenTypeXHeight((void*)font);
 }
 float pgGetFontCapHeight(const PgFont *font) {
-    return pgGetOpenTypeCapHeight((void*)font);
+    return getOpenTypeCapHeight((void*)font);
 }
 PgFontWeight pgGetFontWeight(const PgFont *font) {
     return getOpenTypeWeight((void*)font);
@@ -1820,7 +1472,7 @@ const wchar_t *pgGetFontStyleName(const PgFont *font) {
     return getOpenTypeStyleName((void*)font);
 }
 char *pgGetFontFeatures(const PgFont *font) {
-    return pgGetOpenTypeFontFeatures((void*)font);
+    return getOpenTypeFontFeatures((void*)font);
 }
 
 float pgGetCharLsb(const PgFont *font, unsigned c) {
@@ -1829,28 +1481,22 @@ float pgGetCharLsb(const PgFont *font, unsigned c) {
 float pgGetCharWidth(const PgFont *font, unsigned c) {
     return getOpenTypeCharWidth((void*)font, c);
 }
-float pgGetCharsWidthUtf8(const PgFont *font, const char chars[], int len) {
+float pgGetStringWidthUtf8(const PgFont *font, const char chars[], int len) {
     float width = 0;
     if (len < 0) len = strlen(chars);
     for (int i = 0; i < len; i++) width += pgGetCharWidth(font, chars[i]);
     return width;
 }
-float pgGetCharsWidth(const PgFont *font, const wchar_t chars[], int len) {
+float pgGetStringWidth(const PgFont *font, const wchar_t chars[], int len) {
     float width = 0;
     if (len < 0) len = wcslen(chars);
     for (int i = 0; i < len; i++) width += pgGetCharWidth(font, chars[i]);
     return width;
 }
-float pgFillChar(
-    Pg *gs,
-    const PgFont *font,
-    PgPt at,
-    unsigned c,
-    uint32_t color)
-{
-    return ags_otf_fill_char(gs, (void*)font, at, c, color);
+float pgFillChar(Pg *gs, const PgFont *font, PgPt at, unsigned c, uint32_t color) {
+    return fillOpenTypeChar(gs, (void*)font, at, c, color);
 }
-float pgFillString_utf8(
+float pgFillStringUtf8(
     Pg *gs,
     const PgFont *font,
     PgPt at,
@@ -1858,7 +1504,7 @@ float pgFillString_utf8(
     int len,
     uint32_t color)
 {
-    return fillOpenTypeString_utf8(gs, (void*)font, at, chars, len, color);
+    return fillOpenTypeStringUtf8(gs, (void*)font, at, chars, len, color);
 }
 float pgFillString(
     Pg *gs,
@@ -1871,27 +1517,21 @@ float pgFillString(
     return fillOpenTypeString(gs, (void*)font, at, chars, len, color);
 }
 PgPath *pgGetCharPath(const PgFont *font, const PgMatrix *ctm, unsigned c) {
-    return ags_get_otf_char_path((void*)font, ctm, c);
+    return getOpenTypeCharPath((void*)font, ctm, c);
 }
 unsigned pgGetGlyph(const PgFont *font, unsigned c) {
     return getOpenTypeGlyph((void*)font, c);
 }
-float pgGetGlyph_lsb(const PgFont *font, unsigned g) {
-    return getOpenTypeGlyph_lsb((void*)font, g);
+float pgGetGlyphLsb(const PgFont *font, unsigned g) {
+    return getOpenTypeGlyphLsb((void*)font, g);
 }
-float pgGetGlyph_width(const PgFont *font, unsigned g) {
-    return getOpenTypeGlyph_width((void*)font, g);
+float pgGetGlyphWidth(const PgFont *font, unsigned g) {
+    return getOpenTypeGlyphWidth((void*)font, g);
 }
-float pgFillGlyph(
-    Pg *gs,
-    const PgFont *font,
-    PgPt at,
-    unsigned g,
-    uint32_t color)
-{
-    return ags_otf_fill_glyph(gs, (void*)font, at, g, color);
+float pgFillGlyph(Pg *gs, const PgFont *font, PgPt at, unsigned g, uint32_t color) {
+    return fillOpenTypeGlyph(gs, (void*)font, at, g, color);
 }
-PgPath *pgGetGlyph_path(const PgFont *font, const PgMatrix *ctm, unsigned g) {
+PgPath *pgGetGlyphPath(const PgFont *font, const PgMatrix *ctm, unsigned g) {
     return getOpenTypeGlyphPath((void*)font, ctm, g);
 }
 
@@ -1906,11 +1546,11 @@ PgPath *pgInterpretSvgPath(const char *svg, const PgMatrix *initial_ctm) {
     }
     
     PgMatrix   ctm = initial_ctm? *initial_ctm: PgIdentityMatrix;
-    PgPath     *path = pgNew_path();
+    PgPath     *path = pgNewPath();
     PgPt    cur = {0,0};
     PgPt    start = {0,0};
     PgPt    reflect = {0,0};
-    PgPt    b, c;
+    PgPt    b;
     int         cmd;
     float       a[6];
     while (*svg) {

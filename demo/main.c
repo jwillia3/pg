@@ -121,17 +121,17 @@ const float line_height = 12;
 float list_font_test_variant(PgFontFamily *family, bool italic, int weight, PgPt pt) {
     PgFont *font = pgOpenFontFile(
         italic? family->italic[weight]: family->roman[weight],
-        italic? family->italic_index[weight]: family->roman_index[weight],
+        italic? family->italicIndex[weight]: family->romanIndex[weight],
         false);
     
     if (!font)
         return 0;
-    pgScale_font(font, line_height, 0);
+    pgScaleFont(font, line_height, 0);
     float x2 = pgFillString(gs, font, pt, pgGetFontName(font), -1, fg);
     char buf[10];
     sprintf(buf, " %d", weight*100);
-    x2 += pgFillString_utf8(gs, font, pgPt(pt.x + x2, pt.y), buf, -1, fg);
-    pgFree_font(font);
+    x2 += pgFillStringUtf8(gs, font, pgPt(pt.x + x2, pt.y), buf, -1, fg);
+    pgFreeFont(font);
     return x2;
 }
 void list_font_test() {
@@ -157,7 +157,7 @@ void list_font_test() {
                     }
                 }
             }
-        pgFree_font_family(&families[f]);
+        pgFreeFontFamily(&families[f]);
     }
 }
 void alice_test() {
@@ -176,12 +176,12 @@ void alice_test() {
         float font_size = 15.f;
         float line_height = (font_size * 1.125);
         float measure = 500;
-        pgScale_font(font, font_size, 0);
+        pgScaleFont(font, font_size, 0);
         for (int i = 0, start = skip; i < gs->height / line_height; i++) {
             if (i + start == 0)
-                pgScale_font(font, font_size*1.75, 0);
+                pgScaleFont(font, font_size*1.75, 0);
             else if (i == 1)
-                pgScale_font(font, font_size, 0);
+                pgScaleFont(font, font_size, 0);
             float max_space = pgGetCharWidth(font, ' ') * 3.f;
             
             // Segment into words
@@ -199,7 +199,7 @@ void alice_test() {
                 
                 while (*in && !isspace(*in)) *out++ = *in++;
                 *out++ = 0;
-                widths[nwords] = pgGetCharsWidthUtf8(font, words[nwords], -1);
+                widths[nwords] = pgGetStringWidthUtf8(font, words[nwords], -1);
                 nwords++;
             }
             
@@ -213,7 +213,7 @@ void alice_test() {
             // Print word at a time
             PgPt p = { gs->width / 2 - measure / 2, i * line_height };
             for (int i = 0; i < nwords; i++) {
-                pgFillString_utf8(gs,
+                pgFillStringUtf8(gs,
                     font,
                     p,
                     words[i],
@@ -248,15 +248,15 @@ void letters_test(int language) {
         sprintf(buf, 
             language? japanese: english,
             f);
-        pgScale_font(font, f, 0);
-        pgFillString_utf8(gs,
+        pgScaleFont(font, f, 0);
+        pgFillStringUtf8(gs,
             font,
             pgPt(x+Tick,y),
             buf,
             -1,
             fg);
     }
-    pgScale_font(font, 72, 0);
+    pgScaleFont(font, 72, 0);
     pgFillString(gs,
         font,
         pgPt(300, 0),
@@ -275,14 +275,14 @@ void glyph_test() {
     for (int x = 0; x < gs->width && g < n; x += font_height) {
         wchar_t buf[5];
         swprintf(buf, 5, L"%04X", g);
-        pgScale_font(font, 8, 0);
+        pgScaleFont(font, 8, 0);
         pgFillString(gs, font, pgPt(x,y), buf, 4, 0xff000000);
         
         
-        pgScale_font(font, font_height-5, 0);
+        pgScaleFont(font, font_height-5, 0);
         pgFillGlyph(gs, font, pgPt(x,y+5), g++, fg);
     }
-    pgFree_font(font);
+    pgFreeFont(font);
 }
 
 void svg_test() {
@@ -294,14 +294,14 @@ void svg_test() {
         PgPath *path = pgInterpretSvgPath(TestSVG[i], &gs->ctm);
         pgFill(gs, path, fg);
 //        pgStroke(gs, path, fg2);
-        pgFree_path(path);
+        pgFreePath(path);
     }
 }
 void simple_test() {
     pgScale(gs, .5, .5);
     pgRotate(gs, -Tick * M_PI / 180.f);
     pgTranslate(gs, 100, 100);
-    PgPath *path = pgNew_path();
+    PgPath *path = pgNewPath();
     pgSubpath(path, &gs->ctm, pgPt(0, 300));
     pgCubic(path, &gs->ctm,
         pgPt(0, 250),
@@ -319,7 +319,7 @@ void simple_test() {
     pgClosePath(path);
     pgFill(gs, path, fg);
 //    pgStroke(gs, path, fg2);
-    pgFree_path(path);
+    pgFreePath(path);
 }
 
 void benchmark() {
@@ -334,9 +334,9 @@ void typography_test() {
     PgFont *font = pgOpenFont(Family, 0,0,0);
     if (!font) {
         font = pgOpenFont(L"Arial", 0,0,0);
-        pgScale_font(font, 30, 0);
+        pgScaleFont(font, 30, 0);
         pgFillString(gs, font, pgPt(0,0), L"Font Not Loaded", -1, fg);
-        pgFree_font(font);
+        pgFreeFont(font);
         return;
     }
     
@@ -347,15 +347,15 @@ void typography_test() {
     if (!features) return;
     
     float left = 0;
-    pgScale_font(font, body, 0);
+    pgScaleFont(font, body, 0);
     for (int f = 0; features[f]; f += 4) {
-        float w = pgFillString_utf8(gs, font, pgPt(0,f/4*body), features+f, 4, fg);
+        float w = pgFillStringUtf8(gs, font, pgPt(0,f/4*body), features+f, 4, fg);
         left = max(left, w);
     }
     left += 10;
     
     PgPt p = { left, heading };
-    pgScale_font(font, body, 0);
+    pgScaleFont(font, body, 0);
     float column = 18 * pgGetCharWidth(font, 'M');
     float max_height = heading;
     float top = heading;
@@ -367,9 +367,9 @@ void typography_test() {
         memcpy(feature,features+f,4);
         feature[4] = 0;
         
-        pgScale_font(font, heading, 0);
-        pgFillString_utf8(gs, font, pgPt(p.x, p.y - heading), feature, -1, fg);
-        pgScale_font(font, body, 0);
+        pgScaleFont(font, heading, 0);
+        pgFillStringUtf8(gs, font, pgPt(p.x, p.y - heading), feature, -1, fg);
+        pgScaleFont(font, body, 0);
         
         pgSetFontFeatures(font, feature);
         nsubstitutions = ((PgOpenType*)font)->nsubst;
@@ -385,7 +385,7 @@ void typography_test() {
             w += pgFillGlyph(gs, font, pgPt(p.x+w, p.y), substitutions[i][1], fg);
             char buf[128];
             sprintf(buf, " %04x - %04x", substitutions[i][0] & 0xffff, substitutions[i][1] & 0xffff);
-            pgFillString_utf8(gs, font, pgPt(p.x+w, p.y), buf, -1, fg2);
+            pgFillStringUtf8(gs, font, pgPt(p.x+w, p.y), buf, -1, fg2);
             p.y += body;
         }
         
@@ -418,6 +418,12 @@ void render() {
         list_font_test();
     else if (!strcmp(Mode, "features"))
         typography_test();
+    else {
+        PgFont *font = pgOpenFont(Family, 400, false, 0);
+        pgScaleFont(font, 96, 0);
+        pgFillString(gs, font, pgPt(0, 0), L"Bad command", -1, fg);
+        pgFreeFont(font);
+    }
 }
 
 int main(int argc, char **argv) {
