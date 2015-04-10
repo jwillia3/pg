@@ -12,12 +12,14 @@
 
 HBITMAP Bitmap;
 
-#include <ags/ags.h>
+#include <pg/pg.h>
 #include "test.h"
 
-Ags *gs;
+Pg *gs;
 int Tick;
 int animate;
+char *Mode;
+wchar_t *Family;
 void render();
 
 void *set_size(int width, int height) {
@@ -112,59 +114,58 @@ void *load_file(char *filename) {
 }
 
 int lex_sort(const void *a, const void *b) {
-	return strcmp(a, b);
+    return strcmp(a, b);
 }
 
 const float line_height = 12;
-float list_font_test_variant(AgsFontFamily *family, bool italic, int weight, AgsPoint pt) {
-	AgsFont *font = ags_open_font_file(
-		italic? family->italic[weight]: family->roman[weight],
-		italic? family->italic_index[weight]: family->roman_index[weight],
-		false);
-	
-	if (!font)
-		return 0;
-	ags_scale_font(font, line_height, 0);
-	float x2 = ags_fill_string(gs, font, pt, ags_get_font_name(font), -1, fg);
-	char buf[10];
-	sprintf(buf, " %d", weight*100);
-	x2 += ags_fill_string_utf8(gs, font, ags_pt(pt.x + x2, pt.y), buf, -1, fg);
-	ags_free_font(font);
-	return x2;
+float list_font_test_variant(PgFontFamily *family, bool italic, int weight, PgPt pt) {
+    PgFont *font = pgOpenFontFile(
+        italic? family->italic[weight]: family->roman[weight],
+        italic? family->italic_index[weight]: family->roman_index[weight],
+        false);
+    
+    if (!font)
+        return 0;
+    pgScale_font(font, line_height, 0);
+    float x2 = pgFillString(gs, font, pt, pgGetFontName(font), -1, fg);
+    char buf[10];
+    sprintf(buf, " %d", weight*100);
+    x2 += pgFillString_utf8(gs, font, pgPt(pt.x + x2, pt.y), buf, -1, fg);
+    pgFree_font(font);
+    return x2;
 }
 void list_font_test() {
-	
-	int nfamilies;
-	float max_width = 0;
-	AgsFontFamily *families = ags_scan_fonts(NULL, &nfamilies);
-	
-	AgsPoint pt = { 0, 0 };
-	for (int f = 0; f < nfamilies; f++) {
-	
-		for (int weight = 0; weight < 10; weight++)
-			for (int italic = 0; italic < 2; italic++) {
-				float width = list_font_test_variant(&families[f], italic, weight, pt);
-				if (width) {
-					max_width = max(width, max_width);
-					
-					pt.y += line_height;
-					if (pt.y + line_height >= gs->height) {
-						pt.y = 0;
-						pt.x += max_width;
-						max_width = 0;
-					}
-				}
-			}
-		ags_free_font_family(&families[f]);
-	}
+    
+    int nfamilies;
+    float max_width = 0;
+    PgFontFamily *families = pgScanFonts(NULL, &nfamilies);
+    
+    PgPt pt = { 0, 0 };
+    for (int f = 0; f < nfamilies; f++) {
+    
+        for (int weight = 0; weight < 10; weight++)
+            for (int italic = 0; italic < 2; italic++) {
+                float width = list_font_test_variant(&families[f], italic, weight, pt);
+                if (width) {
+                    max_width = max(width, max_width);
+                    
+                    pt.y += line_height;
+                    if (pt.y + line_height >= gs->height) {
+                        pt.y = 0;
+                        pt.x += max_width;
+                        max_width = 0;
+                    }
+                }
+            }
+        pgFree_font_family(&families[f]);
+    }
 }
 void alice_test() {
-    static AgsFont *font;
+    static PgFont *font;
     if (!font) {
-//        font = ags_open_font_variant(L"Cambria", 400, false, 0);
-        font = ags_open_font_variant(L"RijksoverheidSerif", 400, false, 0);
-		ags_set_font_features(font, "onum");
-	}
+        font = pgOpenFont(Family, 400, false, 0);
+        pgSetFontFeatures(font, "onum");
+    }
     if (!font) return;
 
 
@@ -174,154 +175,151 @@ void alice_test() {
         if (!alice) alice = load_file("alice.txt");
         float font_size = 15.f;
         float line_height = (font_size * 1.125);
-		float measure = 500;
-		ags_scale_font(font, font_size, 0);
-		for (int i = 0, start = skip; i < gs->height / line_height; i++) {
+        float measure = 500;
+        pgScale_font(font, font_size, 0);
+        for (int i = 0, start = skip; i < gs->height / line_height; i++) {
             if (i + start == 0)
-                ags_scale_font(font, font_size*1.75, 0);
+                pgScale_font(font, font_size*1.75, 0);
             else if (i == 1)
-                ags_scale_font(font, font_size, 0);
-			float max_space = ags_get_char_width(font, ' ') * 3.f;
-			
-			// Segment into words
-			char buf[1024];
-			char *words[128];
-			int widths[128];
-			int nwords = 0;
-			
-			char *in = alice + start;
-			char *out = buf;
-			while (*in && *in!='\n') {
-				while (*in && isspace(*in)) in++;
-				if (!*in || *in=='\n') break;
-				words[nwords] = out;
-				
-				while (*in && !isspace(*in)) *out++ = *in++;
-				*out++ = 0;
-				widths[nwords] = ags_get_chars_width(font, words[nwords], -1);
-				nwords++;
-			}
-			
-			float space = measure;
-			for (int i = 0; i < nwords; i++)
-				space -= widths[i];
-			space /= nwords;
-			if (space > max_space)
-				space = ags_get_char_width(font, ' ');
-			
-			// Print word at a time
-			AgsPoint p = { gs->width / 2 - measure / 2, i * line_height };
-			for (int i = 0; i < nwords; i++) {
-				ags_fill_string_utf8(gs,
-	                font,
-	                p,
-	                words[i],
-	                -1,
-	                fg);
-				p.x += widths[i] + space;
-			}
+                pgScale_font(font, font_size, 0);
+            float max_space = pgGetCharWidth(font, ' ') * 3.f;
+            
+            // Segment into words
+            char buf[1024];
+            char *words[128];
+            int widths[128];
+            int nwords = 0;
+            
+            char *in = alice + start;
+            char *out = buf;
+            while (*in && *in!='\n') {
+                while (*in && isspace(*in)) in++;
+                if (!*in || *in=='\n') break;
+                words[nwords] = out;
+                
+                while (*in && !isspace(*in)) *out++ = *in++;
+                *out++ = 0;
+                widths[nwords] = pgGetCharsWidthUtf8(font, words[nwords], -1);
+                nwords++;
+            }
+            
+            float space = measure;
+            for (int i = 0; i < nwords; i++)
+                space -= widths[i];
+            space /= nwords;
+            if (space > max_space)
+                space = pgGetCharWidth(font, ' ');
+            
+            // Print word at a time
+            PgPt p = { gs->width / 2 - measure / 2, i * line_height };
+            for (int i = 0; i < nwords; i++) {
+                pgFillString_utf8(gs,
+                    font,
+                    p,
+                    words[i],
+                    -1,
+                    fg);
+                p.x += widths[i] + space;
+            }
                 
             int n = strcspn(alice + start, "\n");
             start += n + 1;
         }
         
-		if (animate)
-        	skip += 1 + strcspn(alice + skip, "\n");
+        if (animate)
+            skip += 1 + strcspn(alice + skip, "\n");
     }
 }
 void letters_test(int language) {
-    static AgsFont *font;
+    static PgFont *font;
     char *japanese = "%-6.1f 色は匂へど散りぬるを我が世誰ぞ常ならん有為の奥山今日越えて浅き夢見じ酔ひもせず";
     char *english = "%-6.1f The Quick brown=fox jumped over the lazy dog, Götterdämmerung";
-//    wchar_t *font_name = L"Calibri";
-    wchar_t *font_name = L"Source Code Pro";
-	int weight = 400;
-	bool italic = false;
-	
-	if (!font) {
-        font = ags_open_font_variant(font_name, weight, italic, 0);
-		ags_set_font_features(font, "onum,tnum");
-    }
-	if (!font) return;
+    int weight = 400;
+    bool italic = false;
     
-	for (float f = 8, x = 0, y = 0; y < gs->height; y += f * 1.25, f+=.5) {
+    if (!font) {
+        font = pgOpenFont(Family, weight, italic, 0);
+        pgSetFontFeatures(font, "onum,tnum");
+    }
+    if (!font) return;
+    
+    for (float f = 8, x = 0, y = 0; y < gs->height; y += f * 1.25, f+=.5) {
         char buf[128];
         sprintf(buf, 
             language? japanese: english,
             f);
-        ags_scale_font(font, f, 0);
-        ags_fill_string_utf8(gs,
+        pgScale_font(font, f, 0);
+        pgFillString_utf8(gs,
             font,
-            ags_pt(x+Tick,y),
+            pgPt(x+Tick,y),
             buf,
             -1,
             fg);
     }
-	ags_scale_font(font, 72, 0);
-	ags_fill_string(gs,
-		font,
-		ags_pt(300, 0),
-		font_name,
-		-1,
-		(fg & 0xffffff) | 0x60000000);
+    pgScale_font(font, 72, 0);
+    pgFillString(gs,
+        font,
+        pgPt(300, 0),
+        Family,
+        -1,
+        (fg & 0xffffff) | 0x60000000);
 }
 void glyph_test() {
-	wchar_t *font_name = L"Fira Mono";
-	AgsFont *font = ags_open_font_variant(font_name, 400, false, 0);
-	if (!font) return;
-	float font_height = sqrt(gs->width * gs->height / ((AgsOTF*)font)->nglyphs);
-	
-	unsigned g = 0;
-    unsigned n = ((AgsOTF*)font)->nglyphs;
-	for (int y = 0; y < gs->height && g < n; y += font_height)
-	for (int x = 0; x < gs->width && g < n; x += font_height) {
+    PgFont *font = pgOpenFont(Family, 400, false, 0);
+    if (!font) return;
+    float font_height = sqrt(gs->width * gs->height / ((PgOpenType*)font)->nglyphs);
+    
+    unsigned g = 0;
+    unsigned n = ((PgOpenType*)font)->nglyphs;
+    for (int y = 0; y < gs->height && g < n; y += font_height)
+    for (int x = 0; x < gs->width && g < n; x += font_height) {
         wchar_t buf[5];
-		swprintf(buf, 5, L"%04X", g);
-		ags_scale_font(font, 8, 0);
-		ags_fill_string(gs, font, ags_pt(x,y), buf, 4, 0xff000000);
-		
-		
-		ags_scale_font(font, font_height-5, 0);
-		ags_fill_glyph(gs, font, ags_pt(x,y+5), g++, fg);
+        swprintf(buf, 5, L"%04X", g);
+        pgScale_font(font, 8, 0);
+        pgFillString(gs, font, pgPt(x,y), buf, 4, 0xff000000);
+        
+        
+        pgScale_font(font, font_height-5, 0);
+        pgFillGlyph(gs, font, pgPt(x,y+5), g++, fg);
     }
-	ags_free_font(font);
+    pgFree_font(font);
 }
 
 void svg_test() {
-    ags_translate(gs, -396/2, -468/2);
-    ags_rotate(gs, Tick / 3.f * M_PI / 180.f);
-    ags_translate(gs, gs->width / 2, gs->height / 2);
+    pgTranslate(gs, -396/2, -468/2);
+    pgRotate(gs, Tick / 3.f * M_PI / 180.f);
+    pgTranslate(gs, gs->width / 2, gs->height / 2);
     
     for (int i = 0; TestSVG[i]; i++) {
-        AgsPath *path = ags_get_svg_path(TestSVG[i], &gs->ctm);
-        ags_fill_path(gs, path, fg);
-//        ags_stroke_path(gs, path, fg2);
-        ags_free_path(path);
+        PgPath *path = pgInterpretSvgPath(TestSVG[i], &gs->ctm);
+        pgFill(gs, path, fg);
+//        pgStroke(gs, path, fg2);
+        pgFree_path(path);
     }
 }
 void simple_test() {
-    ags_scale(gs, .5, .5);
-    ags_rotate(gs, -Tick * M_PI / 180.f);
-    ags_translate(gs, 100, 100);
-    AgsPath *path = ags_new_path();
-    ags_add_subpath(path, &gs->ctm, ags_pt(0, 300));
-    ags_add_bezier4(path, &gs->ctm,
-        ags_pt(0, 250),
-        ags_pt(300, 250),
-        ags_pt(300, 300));
-    ags_add_bezier4(path, &gs->ctm,
-        ags_pt(300, 600),
-        ags_pt(0, 600),
-        ags_pt(0, 300));
+    pgScale(gs, .5, .5);
+    pgRotate(gs, -Tick * M_PI / 180.f);
+    pgTranslate(gs, 100, 100);
+    PgPath *path = pgNew_path();
+    pgSubpath(path, &gs->ctm, pgPt(0, 300));
+    pgCubic(path, &gs->ctm,
+        pgPt(0, 250),
+        pgPt(300, 250),
+        pgPt(300, 300));
+    pgCubic(path, &gs->ctm,
+        pgPt(300, 600),
+        pgPt(0, 600),
+        pgPt(0, 300));
 
-    ags_close_subpath(path);
-    ags_add_subpath(path, &gs->ctm, ags_pt(300, 0));
-    ags_add_line(path, &gs->ctm, ags_pt(100, 400));
-    ags_add_line(path, &gs->ctm, ags_pt(500, 400));
-    ags_close_subpath(path);
-    ags_fill_path(gs, path, fg);
-//    ags_stroke_path(gs, path, fg2);
-    ags_free_path(path);
+    pgClosePath(path);
+    pgSubpath(path, &gs->ctm, pgPt(300, 0));
+    pgLine(path, &gs->ctm, pgPt(100, 400));
+    pgLine(path, &gs->ctm, pgPt(500, 400));
+    pgClosePath(path);
+    pgFill(gs, path, fg);
+//    pgStroke(gs, path, fg2);
+    pgFree_path(path);
 }
 
 void benchmark() {
@@ -332,112 +330,111 @@ void benchmark() {
     printf("%d ms\n", end - start);
 }
 
-void typography_test(const wchar_t *family) {
-	AgsFont *font = ags_open_font_variant(family, 0,0,0);
-	if (!font) {
-		font = ags_open_font_variant(L"Arial", 0,0,0);
-		ags_scale_font(font, 30, 0);
-		ags_fill_string(gs, font, ags_pt(0,0), L"Font Not Loaded", -1, fg);
-		ags_free_font(font);
-		return;
-	}
-	
-	float heading = 16;
-	float body = 12;
-	
-	char *features = ags_get_font_features(font);
-	if (!features) return;
-	
-	float left = 0;
-	ags_scale_font(font, body, 0);
-	for (int f = 0; features[f]; f += 4) {
-		float w = ags_fill_string_utf8(gs, font, ags_pt(0,f/4*body), features+f, 4, fg);
-		left = max(left, w);
-	}
-	left += 10;
-	
-	AgsPoint p = { left, heading };
-	ags_scale_font(font, body, 0);
-	float column = 18 * ags_get_char_width(font, 'M');
-	float max_height = heading;
-	float top = heading;
-	
-	for (int f = 0; features[f]; f += 4) {
-		char feature[5];
-		uint16_t substitutions[4096][2];
-		int nsubstitutions;
-		memcpy(feature,features+f,4);
-		feature[4] = 0;
-		
-		ags_scale_font(font, heading, 0);
-		ags_fill_string_utf8(gs, font, ags_pt(p.x, p.y - heading), feature, -1, fg);
-		ags_scale_font(font, body, 0);
-		
-		ags_set_font_features(font, feature);
-		nsubstitutions = ((AgsOTF*)font)->nsubst;
-		for (int i = 0; i < nsubstitutions ; i++) {
-			substitutions[i][0] = ((AgsOTF*)font)->subst[i][0];
-			substitutions[i][1] = ((AgsOTF*)font)->subst[i][1];
-		}
-		ags_set_font_features(font, "");
-		
-		for (int i = 0; i < nsubstitutions; i++) {
-			float w = ags_fill_glyph(gs, font, p, substitutions[i][0], fg);
-			w += ags_fill_char(gs, font, ags_pt(p.x+w, p.y), ' ', fg);
-			w += ags_fill_glyph(gs, font, ags_pt(p.x+w, p.y), substitutions[i][1], fg);
-			char buf[128];
-			sprintf(buf, " %04x - %04x", substitutions[i][0] & 0xffff, substitutions[i][1] & 0xffff);
-			ags_fill_string_utf8(gs, font, ags_pt(p.x+w, p.y), buf, -1, fg2);
-			p.y += body;
-		}
-		
-		max_height = max(max_height, p.y);
-		p.x += column;
-		p.y = top;
-		if (p.x + column >= gs->width) {
-			p.x = left;
-			p.y = top = max_height + heading;
-		}
-	}
-	
+void typography_test() {
+    PgFont *font = pgOpenFont(Family, 0,0,0);
+    if (!font) {
+        font = pgOpenFont(L"Arial", 0,0,0);
+        pgScale_font(font, 30, 0);
+        pgFillString(gs, font, pgPt(0,0), L"Font Not Loaded", -1, fg);
+        pgFree_font(font);
+        return;
+    }
+    
+    float heading = 16;
+    float body = 12;
+    
+    char *features = pgGetFontFeatures(font);
+    if (!features) return;
+    
+    float left = 0;
+    pgScale_font(font, body, 0);
+    for (int f = 0; features[f]; f += 4) {
+        float w = pgFillString_utf8(gs, font, pgPt(0,f/4*body), features+f, 4, fg);
+        left = max(left, w);
+    }
+    left += 10;
+    
+    PgPt p = { left, heading };
+    pgScale_font(font, body, 0);
+    float column = 18 * pgGetCharWidth(font, 'M');
+    float max_height = heading;
+    float top = heading;
+    
+    for (int f = 0; features[f]; f += 4) {
+        char feature[5];
+        uint16_t substitutions[4096][2];
+        int nsubstitutions;
+        memcpy(feature,features+f,4);
+        feature[4] = 0;
+        
+        pgScale_font(font, heading, 0);
+        pgFillString_utf8(gs, font, pgPt(p.x, p.y - heading), feature, -1, fg);
+        pgScale_font(font, body, 0);
+        
+        pgSetFontFeatures(font, feature);
+        nsubstitutions = ((PgOpenType*)font)->nsubst;
+        for (int i = 0; i < nsubstitutions ; i++) {
+            substitutions[i][0] = ((PgOpenType*)font)->subst[i][0];
+            substitutions[i][1] = ((PgOpenType*)font)->subst[i][1];
+        }
+        pgSetFontFeatures(font, "");
+        
+        for (int i = 0; i < nsubstitutions; i++) {
+            float w = pgFillGlyph(gs, font, p, substitutions[i][0], fg);
+            w += pgFillChar(gs, font, pgPt(p.x+w, p.y), ' ', fg);
+            w += pgFillGlyph(gs, font, pgPt(p.x+w, p.y), substitutions[i][1], fg);
+            char buf[128];
+            sprintf(buf, " %04x - %04x", substitutions[i][0] & 0xffff, substitutions[i][1] & 0xffff);
+            pgFillString_utf8(gs, font, pgPt(p.x+w, p.y), buf, -1, fg2);
+            p.y += body;
+        }
+        
+        max_height = max(max_height, p.y);
+        p.x += column;
+        p.y = top;
+        if (p.x + column >= gs->width) {
+            p.x = left;
+            p.y = top = max_height + heading;
+        }
+    }
+    
 }
 
 void render() {
-    ags_clear(gs, bg);
-    ags_load_identity(gs);
+    pgClear(gs, bg);
+    pgLoadIdentity(gs);
     
-//    simple_test();
-//    svg_test();
-//    letters_test(0);
-//    glyph_test();
-//    alice_test();
-    list_font_test();
-//		typography_test(L"Source Code Pro");
-//		typography_test(L"RijksoverheidSansText");
-//    benchmark(); return false;
-
-//	AgsFont *font = ags_open_font_variant(L"Source Code Pro", 0,0,0);
-//	if (!font) return;
-////	ags_fill_char(gs, font, ags_pt(0,0), '=', fg);
-//	AgsPath *path = ags_get_char_path(font, &gs->ctm, '=');
-//	ags_stroke_path(gs, path, fg);
-//
-
+    if (!strcmp(Mode, "simple"))
+        simple_test();
+    else if (!strcmp(Mode, "svg"))
+        svg_test();
+    else if (!strcmp(Mode, "letters"))
+        letters_test(0);
+    else if (!strcmp(Mode, "glyph"))
+        glyph_test();
+    else if (!strcmp(Mode, "alice"))
+        alice_test();
+    else if (!strcmp(Mode, "list"))
+        list_font_test();
+    else if (!strcmp(Mode, "features"))
+        typography_test();
 }
 
-int main() {
+int main(int argc, char **argv) {
     HINSTANCE kernel32 = LoadLibrary(L"kernel32.dll");
-	BOOL (*GetProcessUserModeExceptionPolicy)(DWORD*) = kernel32? (void*)GetProcAddress(kernel32, "GetProcessUserModeExceptionPolicy"): 0;
-	BOOL (*SetProcessUserModeExceptionPolicy)(DWORD) = kernel32? (void*)GetProcAddress(kernel32, "SetProcessUserModeExceptionPolicy"): 0;
-	if (!GetProcessUserModeExceptionPolicy)
-		FatalAppExit(0, L"XXX");
-	DWORD dwFlags;
-	#define PROCESS_CALLBACK_FILTER_ENABLED     0x1
-	if (GetProcessUserModeExceptionPolicy(&dwFlags)) {
-	     SetProcessUserModeExceptionPolicy(dwFlags & ~PROCESS_CALLBACK_FILTER_ENABLED); // turn off bit 1
-	}
+    BOOL (*GetProcessUserModeExceptionPolicy)(DWORD*) = kernel32? (void*)GetProcAddress(kernel32, "GetProcessUserModeExceptionPolicy"): 0;
+    BOOL (*SetProcessUserModeExceptionPolicy)(DWORD) = kernel32? (void*)GetProcAddress(kernel32, "SetProcessUserModeExceptionPolicy"): 0;
+    if (GetProcessUserModeExceptionPolicy) {
+        DWORD dwFlags;
+        #define PROCESS_CALLBACK_FILTER_ENABLED     0x1
+        if (GetProcessUserModeExceptionPolicy(&dwFlags)) {
+             SetProcessUserModeExceptionPolicy(dwFlags & ~PROCESS_CALLBACK_FILTER_ENABLED); // turn off bit 1
+        }
+    }
+    Mode = argv[1]? argv[1]: "alice";
+    Family = argc > 2? pgUtf8To16(argv[2], -1, NULL): L"Arial";
     
     int width = 1024, height = 800;
-    gs = ags_new(set_size(width, height), width, height);
+    gs = pgNew(set_size(width, height), width, height);
     display(width, height);
 }

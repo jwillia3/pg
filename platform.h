@@ -1,3 +1,3 @@
-void platform_scan_directory(const wchar_t *dir, void per_file(const wchar_t *name, void *data));
-wchar_t **platform_list_fonts(int *countp);
-AgsFont *platform_open_font_file(const wchar_t *filename, int font_index, bool scan_only);
+void _pgScanDirectory(const wchar_t *dir, void per_file(const wchar_t *name, void *data));
+wchar_t **_pgListFonts(int *countp);
+PgFont *_pgOpenFontFile(const wchar_t *filename, int font_index, bool scan_only);

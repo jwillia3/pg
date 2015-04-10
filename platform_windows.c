@@ -8,8 +8,8 @@
 #include <wchar.h>
 #include <windows.h>
 #pragma comment(lib, "advapi32")
-#include <ags/ags.h>
-#include <ags/platform.h>
+#include <pg/pg.h>
+#include <pg/platform.h>
 
 typedef struct {
     HANDLE file;
@@ -17,7 +17,7 @@ typedef struct {
     HANDLE view;
 } Host;
 
-static void *load_file(Host *host, const wchar_t *filename) {
+static void *loadFile(Host *host, const wchar_t *filename) {
     host->file = CreateFile(filename,
         GENERIC_READ,
         FILE_SHARE_DELETE | FILE_SHARE_READ,
@@ -50,13 +50,13 @@ static void *load_file(Host *host, const wchar_t *filename) {
     return host->view;
 }
 
-static void free_file_mapping(Host *host) {
+static void freeFileMapping(Host *host) {
     UnmapViewOfFile(host->view);
     CloseHandle(host->mapping);
     CloseHandle(host->file);
 }
 
-void ags_platform_scan_directory(const wchar_t *dir, void per_file(const wchar_t *name, void *data)) {
+void _pgScanDirectory(const wchar_t *dir, void perFile(const wchar_t *name, void *data)) {
     WIN32_FIND_DATA data;
     if (!dir)
         dir = L"C:\\Windows\\Fonts";
@@ -74,21 +74,21 @@ void ags_platform_scan_directory(const wchar_t *dir, void per_file(const wchar_t
             Host host;
             
             swprintf(full, MAX_PATH*2, L"%ls\\%ls", dir, data.cFileName);
-            if (load_file(&host, full)) {
-                per_file(full, host.view);
-                free_file_mapping(&host);
+            if (loadFile(&host, full)) {
+                perFile(full, host.view);
+                freeFileMapping(&host);
             }
         } while (FindNextFile(h, &data));
         FindClose(h);
     }
 }
 
-static void host_free(AgsFont *font) {
-    free_file_mapping(font->host);
+static void hostFree(PgFont *font) {
+    freeFileMapping(font->host);
     free(font->host);
 }
 
-wchar_t **platform_list_fonts(int *countp) {
+wchar_t **_pgListFonts(int *countp) {
     const wchar_t *path = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
     
     wchar_t **out = calloc(1, sizeof *out);
@@ -100,7 +100,7 @@ wchar_t **platform_list_fonts(int *countp) {
     DWORD nchild;
     RegQueryInfoKey(key, 0,0, 0, 0,0, 0, &nchild, 0, 0, 0, 0);
     
-    AgsFont *font = NULL;
+    PgFont *font = NULL;
     
     for (int i = 0; i < nchild; i++) {
         wchar_t name_buffer[4096];
@@ -135,14 +135,14 @@ wchar_t **platform_list_fonts(int *countp) {
     return out;
 }
 
-AgsFont *platform_open_font_file(const wchar_t *filename, int font_index, bool scan_only) {
+PgFont *_pgOpenFontFile(const wchar_t *filename, int font_index, bool scan_only) {
     Host *host = calloc(1, sizeof *host);
-    void *data = load_file(host, filename);
+    void *data = loadFile(host, filename);
     if (data) {
-        AgsFont *font = ags_load_font(data, font_index, false);
+        PgFont *font = pgLoadFont(data, font_index, false);
         if (font) {
             font->host = host;
-            font->host_free = host_free;
+            font->host_free = hostFree;
         }
         return font;
     } else {
