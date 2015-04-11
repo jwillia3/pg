@@ -5,6 +5,8 @@
 #include <float.h>
 #include <windows.h>
 #include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #pragma comment(lib, "gdi32")

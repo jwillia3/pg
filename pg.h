@@ -1,7 +1,4 @@
 // Plain Graphics Library
-#include <stdbool.h>
-#include <stdint.h>
-
 typedef struct { float x, y; } PgPt;
 typedef struct { PgPt a, b; } PgRect;
 typedef struct { float a, b, c, d, e, f; } PgMatrix;
