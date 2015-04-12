@@ -1,2 +1,2 @@
 pg.lib:    *.c *.h
-	cl -nologo -Zi -fp:fast -c -I .. *.c && lib -nologo -nodefaultlib -out:pg.lib *.obj
+	cl -nologo -we4013 -Zi -fp:fast -c -I .. *.c && lib -nologo -nodefaultlib -out:pg.lib *.obj

@@ -12,10 +12,47 @@
 #pragma comment(lib, "gdi32")
 #pragma comment(lib, "user32")
 
-HBITMAP Bitmap;
-
 #include <pg/pg.h>
+#include <pg/common.h>
 #include "test.h"
+
+typedef struct {
+    PgBitmapCanvas _;
+    HBITMAP dib;
+} PgDibCanvas;
+
+void _free(Pg *g) {
+    DeleteObject(((PgDibCanvas*)g)->dib);
+    free(g);
+}
+void _resize(Pg *g, int width, int height) {
+    DeleteObject(((PgDibCanvas*)g)->dib);
+    g->width = width;
+    g->height = height;
+    ((PgDibCanvas*)g)->dib = CreateDIBSection(NULL,
+        &(BITMAPINFO){ {
+            sizeof(BITMAPINFOHEADER),
+            width, -height, 1, 32,  0,
+            width * height * 4,
+            72, 72, -1, -1 }},
+        DIB_RGB_COLORS,
+        &((PgBitmapCanvas*)g)->data,
+        NULL, 0);
+}
+PgDibCanvas pgDefaultDibCanvas() {
+    PgDibCanvas g;
+    g._ = pgDefaultBitmapCanvas();
+    g._._.free = _free;
+    g._._.resize = _resize;
+    g.dib = NULL;
+    return g;
+}
+Pg *pgNewDibCanvas(int width, int height) {
+    Pg *g = NEW(PgDibCanvas);
+    *(PgDibCanvas*)g = pgDefaultDibCanvas();
+    $(resize, g, width, height);
+    return g;
+}
 
 Pg *gs;
 int Tick;
@@ -24,22 +61,14 @@ char *Mode;
 wchar_t *Family;
 void render();
 
-void *set_size(int width, int height) {
-    void *buffer;
-    BITMAPINFO info = { {sizeof info.bmiHeader,
-        width, -height, 1, 32,  0,width * height * 4, 72, 72, -1, -1 }};
-    Bitmap = CreateDIBSection(NULL, &info, DIB_RGB_COLORS, &buffer, NULL, 0);
-    return buffer;
-}
-
 LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-        PAINTSTRUCT ps;
+    PAINTSTRUCT ps;
     switch (msg) {
     case WM_PAINT:
         BeginPaint(hwnd, &ps);
         HDC dc;
         dc = CreateCompatibleDC(ps.hdc);
-        SelectObject(dc, Bitmap);
+        SelectObject(dc, ((PgDibCanvas*)gs)->dib);
         BitBlt(ps.hdc,
             ps.rcPaint.left, ps.rcPaint.top,
             ps.rcPaint.right, ps.rcPaint.bottom,
@@ -53,10 +82,7 @@ LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
         Tick++;
         return 0;
     case WM_SIZE:
-        DeleteObject(Bitmap);
-        gs->width = LOWORD(lparam);
-        gs->height = HIWORD(lparam);
-        gs->buf = set_size(gs->width, gs->height);
+        $(resize, gs, LOWORD(lparam), HIWORD(lparam));
         render();
         return 0;
     case WM_ERASEBKGND:
@@ -123,17 +149,17 @@ const float line_height = 12;
 float list_font_test_variant(PgFontFamily *family, bool italic, int weight, PgPt pt) {
     PgFont *font = pgOpenFontFile(
         italic? family->italic[weight]: family->roman[weight],
-        italic? family->italic_index[weight]: family->roman_index[weight],
+        italic? family->italicIndex[weight]: family->romanIndex[weight],
         false);
     
     if (!font)
         return 0;
-    pgScale_font(font, line_height, 0);
-    float x2 = pgFillString(gs, font, pt, pgGetFontName(font), -1, fg);
+    $(scale, font, line_height, 0);
+    float x2 = $(fillString, gs, font, pt, $(getName, font), -1, fg);
     char buf[10];
     sprintf(buf, " %d", weight*100);
-    x2 += pgFillString_utf8(gs, font, pgPt(pt.x + x2, pt.y), buf, -1, fg);
-    pgFree_font(font);
+    x2 += $(fillUtf8, gs, font, pgPt(pt.x + x2, pt.y), buf, -1, fg);
+    $(free, font);
     return x2;
 }
 void list_font_test() {
@@ -159,14 +185,14 @@ void list_font_test() {
                     }
                 }
             }
-        pgFree_font_family(&families[f]);
+        pgFreeFontFamily(&families[f]);
     }
 }
 void alice_test() {
     static PgFont *font;
     if (!font) {
         font = pgOpenFont(Family, 400, false, 0);
-        pgSetFontFeatures(font, "onum");
+        $(useFeatures, font, "onum");
     }
     if (!font) return;
 
@@ -178,13 +204,13 @@ void alice_test() {
         float font_size = 15.f;
         float line_height = (font_size * 1.125);
         float measure = 500;
-        pgScale_font(font, font_size, 0);
+        $(scale, font, font_size, 0);
         for (int i = 0, start = skip; i < gs->height / line_height; i++) {
             if (i + start == 0)
-                pgScale_font(font, font_size*1.75, 0);
+                $(scale, font, font_size*1.75, 0);
             else if (i == 1)
-                pgScale_font(font, font_size, 0);
-            float max_space = pgGetCharWidth(font, ' ') * 3.f;
+                $(scale, font, font_size, 0);
+            float max_space = $(getCharWidth, font, ' ') * 3.f;
             
             // Segment into words
             char buf[1024];
@@ -201,7 +227,7 @@ void alice_test() {
                 
                 while (*in && !isspace(*in)) *out++ = *in++;
                 *out++ = 0;
-                widths[nwords] = pgGetCharsWidthUtf8(font, words[nwords], -1);
+                widths[nwords] = $(getUtf8Width, font, words[nwords], -1);
                 nwords++;
             }
             
@@ -210,12 +236,12 @@ void alice_test() {
                 space -= widths[i];
             space /= nwords;
             if (space > max_space)
-                space = pgGetCharWidth(font, ' ');
+                space = $(getCharWidth, font, ' ');
             
             // Print word at a time
             PgPt p = { gs->width / 2 - measure / 2, i * line_height };
             for (int i = 0; i < nwords; i++) {
-                pgFillString_utf8(gs,
+                $(fillUtf8, gs,
                     font,
                     p,
                     words[i],
@@ -241,7 +267,7 @@ void letters_test(int language) {
     
     if (!font) {
         font = pgOpenFont(Family, weight, italic, 0);
-        pgSetFontFeatures(font, "onum,tnum");
+        $(useFeatures, font, "onum,tnum");
     }
     if (!font) return;
     
@@ -250,16 +276,16 @@ void letters_test(int language) {
         sprintf(buf, 
             language? japanese: english,
             f);
-        pgScale_font(font, f, 0);
-        pgFillString_utf8(gs,
+        $(scale, font, f, 0);
+        $(fillUtf8, gs,
             font,
             pgPt(x+Tick,y),
             buf,
             -1,
             fg);
     }
-    pgScale_font(font, 72, 0);
-    pgFillString(gs,
+    $(scale, font, 72, 0);
+    $(fillString, gs,
         font,
         pgPt(300, 0),
         Family,
@@ -277,51 +303,49 @@ void glyph_test() {
     for (int x = 0; x < gs->width && g < n; x += font_height) {
         wchar_t buf[5];
         swprintf(buf, 5, L"%04X", g);
-        pgScale_font(font, 8, 0);
-        pgFillString(gs, font, pgPt(x,y), buf, 4, 0xff000000);
+        $(scale, font, 8, 0);
+        $(fillString, gs, font, pgPt(x,y), buf, 4, 0xff000000);
         
         
-        pgScale_font(font, font_height-5, 0);
-        pgFillGlyph(gs, font, pgPt(x,y+5), g++, fg);
+        $(scale, font, font_height-5, 0);
+        $(fillGlyph, gs, font, pgPt(x,y+5), g++, fg);
     }
-    pgFree_font(font);
+    $(free, font);
 }
 
 void svg_test() {
-    pgTranslate(gs, -396/2, -468/2);
-    pgRotate(gs, Tick / 3.f * M_PI / 180.f);
-    pgTranslate(gs, gs->width / 2, gs->height / 2);
+    $(translate, gs, -396/2, -468/2);
+    $(rotate, gs, Tick / 3.f * M_PI / 180.f);
+    $(translate, gs, gs->width / 2, gs->height / 2);
     
     for (int i = 0; TestSVG[i]; i++) {
         PgPath *path = pgInterpretSvgPath(TestSVG[i], &gs->ctm);
-        pgFill(gs, path, fg);
-//        pgStroke(gs, path, fg2);
-        pgFree_path(path);
+        $(fill, gs, path, fg);
+        $(free, path);
     }
 }
 void simple_test() {
-    pgScale(gs, .5, .5);
-    pgRotate(gs, -Tick * M_PI / 180.f);
-    pgTranslate(gs, 100, 100);
-    PgPath *path = pgNew_path();
-    pgSubpath(path, &gs->ctm, pgPt(0, 300));
-    pgCubic(path, &gs->ctm,
+    $(scale, gs, .5, .5);
+    $(rotate, gs, -Tick * M_PI / 180.f);
+    $(translate, gs, 100, 100);
+    PgPath *path = pgNewPath();
+    $(move, path, &gs->ctm, pgPt(0, 300));
+    $(cubic, path, &gs->ctm,
         pgPt(0, 250),
         pgPt(300, 250),
         pgPt(300, 300));
-    pgCubic(path, &gs->ctm,
+    $(cubic, path, &gs->ctm,
         pgPt(300, 600),
         pgPt(0, 600),
         pgPt(0, 300));
 
-    pgClosePath(path);
-    pgSubpath(path, &gs->ctm, pgPt(300, 0));
-    pgLine(path, &gs->ctm, pgPt(100, 400));
-    pgLine(path, &gs->ctm, pgPt(500, 400));
-    pgClosePath(path);
-    pgFill(gs, path, fg);
-//    pgStroke(gs, path, fg2);
-    pgFree_path(path);
+    $(close, path);
+    $(move, path, &gs->ctm, pgPt(300, 0));
+    $(line, path, &gs->ctm, pgPt(100, 400));
+    $(line, path, &gs->ctm, pgPt(500, 400));
+    $(close, path);
+    $(fill, gs, path, fg);
+    $(free, path);
 }
 
 void benchmark() {
@@ -336,29 +360,29 @@ void typography_test() {
     PgFont *font = pgOpenFont(Family, 0,0,0);
     if (!font) {
         font = pgOpenFont(L"Arial", 0,0,0);
-        pgScale_font(font, 30, 0);
-        pgFillString(gs, font, pgPt(0,0), L"Font Not Loaded", -1, fg);
-        pgFree_font(font);
+        $(scale, font, 30, 0);
+        $(fillString, gs, font, pgPt(0,0), L"Font Not Loaded", -1, fg);
+        $(free, font);
         return;
     }
     
     float heading = 16;
     float body = 12;
     
-    char *features = pgGetFontFeatures(font);
+    char *features = $(getFeatures, font);
     if (!features) return;
     
     float left = 0;
-    pgScale_font(font, body, 0);
+    $(scale, font, body, 0);
     for (int f = 0; features[f]; f += 4) {
-        float w = pgFillString_utf8(gs, font, pgPt(0,f/4*body), features+f, 4, fg);
+        float w = $(fillUtf8, gs, font, pgPt(0,f/4*body), features+f, 4, fg);
         left = max(left, w);
     }
     left += 10;
     
     PgPt p = { left, heading };
-    pgScale_font(font, body, 0);
-    float column = 18 * pgGetCharWidth(font, 'M');
+    $(scale, font, body, 0);
+    float column = 18 * $(getCharWidth, font, 'M');
     float max_height = heading;
     float top = heading;
     
@@ -369,25 +393,25 @@ void typography_test() {
         memcpy(feature,features+f,4);
         feature[4] = 0;
         
-        pgScale_font(font, heading, 0);
-        pgFillString_utf8(gs, font, pgPt(p.x, p.y - heading), feature, -1, fg);
-        pgScale_font(font, body, 0);
+        $(scale, font, heading, 0);
+        $(fillUtf8, gs, font, pgPt(p.x, p.y - heading), feature, -1, fg);
+        $(scale, font, body, 0);
         
-        pgSetFontFeatures(font, feature);
+        $(useFeatures, font, feature);
         nsubstitutions = ((PgOpenType*)font)->nsubst;
         for (int i = 0; i < nsubstitutions ; i++) {
             substitutions[i][0] = ((PgOpenType*)font)->subst[i][0];
             substitutions[i][1] = ((PgOpenType*)font)->subst[i][1];
         }
-        pgSetFontFeatures(font, "");
+        $(useFeatures, font, "");
         
         for (int i = 0; i < nsubstitutions; i++) {
-            float w = pgFillGlyph(gs, font, p, substitutions[i][0], fg);
-            w += pgFillChar(gs, font, pgPt(p.x+w, p.y), ' ', fg);
-            w += pgFillGlyph(gs, font, pgPt(p.x+w, p.y), substitutions[i][1], fg);
+            float w = $(fillGlyph, gs, font, p, substitutions[i][0], fg);
+            w += $(fillChar, gs, font, pgPt(p.x+w, p.y), ' ', fg);
+            w += $(fillGlyph, gs, font, pgPt(p.x+w, p.y), substitutions[i][1], fg);
             char buf[128];
             sprintf(buf, " %04x - %04x", substitutions[i][0] & 0xffff, substitutions[i][1] & 0xffff);
-            pgFillString_utf8(gs, font, pgPt(p.x+w, p.y), buf, -1, fg2);
+            $(fillUtf8, gs, font, pgPt(p.x+w, p.y), buf, -1, fg2);
             p.y += body;
         }
         
@@ -403,8 +427,8 @@ void typography_test() {
 }
 
 void render() {
-    pgClear(gs, bg);
-    pgLoadIdentity(gs);
+    $(clear, gs, bg);
+    $(identity, gs);
     
     if (!strcmp(Mode, "simple"))
         simple_test();
@@ -420,6 +444,12 @@ void render() {
         list_font_test();
     else if (!strcmp(Mode, "features"))
         typography_test();
+    else {
+        PgFont *font = pgOpenFont(Family, 400, false, 0);
+        $(scale, font, 96, 0);
+        $(fillString, gs, font, pgPt(0, 0), L"Bad command", -1, fg);
+        $(free, font);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -437,6 +467,6 @@ int main(int argc, char **argv) {
     Family = argc > 2? pgUtf8To16(argv[2], -1, NULL): L"Arial";
     
     int width = 1024, height = 800;
-    gs = pgNew(set_size(width, height), width, height);
+    gs = pgNewDibCanvas(width, height);
     display(width, height);
 }

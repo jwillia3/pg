@@ -85,66 +85,19 @@ void _pgScanDirectory(const wchar_t *dir, void perFile(const wchar_t *name, void
     }
 }
 
-static void hostFree(PgFont *font) {
+static void freeHost(PgFont *font) {
     freeFileMapping(font->host);
     free(font->host);
-}
-
-wchar_t **_pgListFonts(int *countp) {
-    const wchar_t *path = L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
-    
-    wchar_t **out = calloc(1, sizeof *out);
-    int nout = 0;
-    
-    HKEY key = NULL;
-    RegOpenKey(HKEY_LOCAL_MACHINE, path, &key);
-    
-    DWORD nchild;
-    RegQueryInfoKey(key, 0,0, 0, 0,0, 0, &nchild, 0, 0, 0, 0);
-    
-    PgFont *font = NULL;
-    
-    for (int i = 0; i < nchild; i++) {
-        wchar_t name_buffer[4096];
-        wchar_t *name = name_buffer;
-        wchar_t *x;
-        
-        DWORD len = 4096;
-        RegEnumValue(key, i, name, &len, 0, 0, 0, 0);
-        
-        if (x = wcsstr(name, L" (TrueType)"))
-            *x = 0;
-        
-        wchar_t *next = NULL;
-        int font_index = 0;
-        do {
-            next = wcsstr(name, L" & ");
-            if (next) {
-                *next = 0;
-                next += 3;
-            }
-            
-            out = realloc(out, (nout + 2) * sizeof *out);
-            out[nout++] = wcsdup(name);
-            
-            font_index++;
-        } while (name = next);
-    }
-    if (countp)
-        *countp = nout;
-    out[nout] = NULL;
-    RegCloseKey(key);
-    return out;
 }
 
 PgFont *_pgOpenFontFile(const wchar_t *filename, int font_index, bool scan_only) {
     Host *host = calloc(1, sizeof *host);
     void *data = loadFile(host, filename);
     if (data) {
-        PgFont *font = pgLoadFont(data, font_index, false);
+        PgFont *font = pgLoadFont(data, font_index, scan_only);
         if (font) {
             font->host = host;
-            font->host_free = hostFree;
+            font->_freeHost = freeHost;
         }
         return font;
     } else {
