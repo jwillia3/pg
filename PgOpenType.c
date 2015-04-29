@@ -64,38 +64,36 @@ static void glyphPath(PgPath *path, const PgOpenType *font, const PgMatrix *ctm,
     
     if (ncontours < 0) {
         uint16_t flags, glyph;
-        int16_t arg1, arg2;
         do {
             unpack(&data, "SS", &flags, &glyph);
+            float a = 1, b = 0, c = 0, d = 1, e = 0, f = 0;
+            if (flags & 3 == 3) { // x & y words
+                int16_t ee, ff;
+                unpack(&data, "SS", &ee, &ff);
+                e = ee, f = ff;
+            } else if (flags & 2) { // x & y bytes
+                int8_t ee, ff;
+                unpack(&data, "BB", &ee, &ff);
+                e = ee, f = ff;
+            } else if (flags & 1) // matching points
+                unpack(&data, "s"), e = f = 0;
+            else // matching points
+                unpack(&data, "b"), e = f = 0;
             
-            PgMatrix new_ctm = PgIdentityMatrix;
-            
-            if (flags & 1) // args are words
-                unpack(&data, "SS", &arg1, &arg2);
-            else { // args are bytes
-                uint8_t a, b;
-                unpack(&data, "BB", &a, &b);
-                arg1 = a;
-                arg2 = b;
+            if (flags & 8) { // single scale
+                int16_t ss;
+                unpack(&data, "S", &ss);
+                a = d = ss;
+            } else if (flags & 64) { // x & y scales
+                int16_t aa, dd;
+                unpack(&data, "SS", &aa, &dd);
+                a = aa, d = dd;
+            } else if (flags & 128) { // 2x2
+                int16_t aa, bb, cc, dd;
+                unpack(&data, "SSSS", &aa, &bb, &cc, &dd);
+                a = aa, b = bb, c = cc, d = dd;
             }
-            
-            if (flags & 2) // args are x & y
-                pgTranslateMatrix(&new_ctm, arg1, arg2);
-            else {
-                // TODO: "matching points"
-            }
-            
-            int16_t sx = 1, sy = 1;
-            int16_t shearx=0, sheary=0;
-            if (flags & 8) { // scale
-                unpack(&data, "S", &sx);
-                sy = sx;
-            } else if (flags & 64) // x & y scale
-                unpack(&data, "SS", &sx, &sy);
-            else if (flags & 128) // 2x2 matrix
-                unpack(&data, "SSSS", &sx, &shearx, &sheary, &sy);
-            
-            pgScaleMatrix(&new_ctm, sx, sy);
+            PgMatrix new_ctm = {a, b, c, d, e, f};
             pgMultiplyMatrix(&new_ctm, ctm);
             glyphPath(path, font, &new_ctm, glyph);
         } while (flags & 32);
