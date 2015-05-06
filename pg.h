@@ -184,7 +184,7 @@ typedef struct {
 
 const static PgMatrix PgIdentityMatrix = { 1, 0, 0, 1, 0, 0 };
 
-// MISCELLANEOU
+// MISCELLANEOUS
     static PgPt pgPt(float x, float y) { PgPt p = { x, y }; return p; }
     static PgRect pgRect(PgPt a, PgPt b) { PgRect r; r.a=a;r.b=b; return r; }
     static uint32_t pgRgb(uint8_t r, uint8_t g, uint8_t b) {

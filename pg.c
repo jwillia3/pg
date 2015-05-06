@@ -14,19 +14,21 @@
 #include <pg/platform.h>
 #include "common.h"
 
-uint32_t pgBlend(uint32_t bg, uint32_t fg, uint32_t a) {
-    if (a == 0xff)
-        return fg;
-    else if (a == 0)
-        return bg;
-    unsigned na = 255 - a;
-    unsigned rb = ((( fg & 0x00ff00ff) * a) +
-                    ((bg & 0x00ff00ff) * na)) &
-                    0xff00ff00;
-    unsigned g = (((  fg & 0x0000ff00) * a) +
-                    ((bg & 0x0000ff00) * na)) &
-                    0x00ff0000;
-    return (rb | g) >> 8;
+#define Gamma 2.2f
+uint32_t pgBlend(uint32_t bg, uint32_t fg, uint32_t a255) {
+    if (a255 == 255) return fg;
+    if (a255 == 0) return bg;
+    static float enc[256];
+    if (!enc[1]) {
+        for (float i = 0; i < 256.0f; i++)
+            enc[(int)i] = powf(i, Gamma);
+    }
+    float a = a255 / 255.0f;
+    float na = 1.0f - a;
+    uint8_t r = powf(a * enc[fg >> 16 & 255] + na * enc[bg >> 16 & 255], 1.0f / Gamma);
+    uint8_t g = powf(a * enc[fg >>  8 & 255] + na * enc[bg >>  8 & 255], 1.0f / Gamma);
+    uint8_t b = powf(a * enc[fg >>  0 & 255] + na * enc[bg >>  0 & 255], 1.0f / Gamma);
+    return (r << 16) + (g << 8) + b;
 }
 
 void pgIdentityMatrix(PgMatrix *mat) {

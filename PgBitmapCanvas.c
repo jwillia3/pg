@@ -168,45 +168,46 @@ static void fillSegments(const Pg *g, const Segment *segs, int nsegs, uint32_t c
         }
 
         // Copy buffer to screen
-        if ((g->width & 3) == 0) {
-            if (min_x & 3)
-                min_x &= ~3;
-            if (max_x & 3)
-                max_x = clamp(0, max_x + 3 & ~3, g->width - 1);
-            else
-                max_x = clamp(0, max_x + 4, g->width - 1);
-                
-            uint32_t * __restrict   screen = ((PgBitmapCanvas*)g)->data + scan_y * g->width;
-            __m128i fg = _mm_set_epi32(color, color, color, color);
-            for (int i = min_x; i < max_x; i += 4) {
-                __m128i a = _mm_setr_epi32(buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]);
-                __m128i na = _mm_sub_epi32(_mm_set1_epi32(255), a);
-                __m128i bg = _mm_load_si128((__m128i*)(screen + i));
-                
-                __m128i rb_fg = _mm_and_si128(fg, _mm_set1_epi32(0x00ff00ff));
-                __m128i rb_bg = _mm_and_si128(bg, _mm_set1_epi32(0x00ff00ff));
-                __m128i  g_fg = _mm_and_si128(fg, _mm_set1_epi32(0x0000ff00));
-                __m128i  g_bg = _mm_and_si128(bg, _mm_set1_epi32(0x0000ff00));
-                
-                rb_fg = _mm_or_si128(
-                            _mm_mul_epu32(rb_fg, a),
-                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(rb_fg, 4), _mm_srli_si128(a, 4)), 4));
-                rb_bg = _mm_or_si128(
-                            _mm_mul_epu32(rb_bg, na),
-                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(rb_bg, 4), _mm_srli_si128(na, 4)), 4));
-                __m128i rb = _mm_and_si128(_mm_add_epi32(rb_bg, rb_fg), _mm_set1_epi32(0xff00ff00));
-                
-                g_fg = _mm_or_si128(
-                            _mm_mul_epu32(g_fg, a),
-                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(g_fg, 4), _mm_srli_si128(a, 4)), 4));
-                g_bg = _mm_or_si128(
-                            _mm_mul_epu32(g_bg, na),
-                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(g_bg, 4), _mm_srli_si128(na, 4)), 4));
-                __m128i g = _mm_and_si128(_mm_add_epi32(g_bg, g_fg), _mm_set1_epi32(0x00ff0000));
-                
-                *(__m128i*)(screen + i) = _mm_srli_epi32(_mm_or_si128(rb, g), 8);
-            }
-        } else {
+//        if ((g->width & 3) == 0) {
+//            if (min_x & 3)
+//                min_x &= ~3;
+//            if (max_x & 3)
+//                max_x = clamp(0, max_x + 3 & ~3, g->width - 1);
+//            else
+//                max_x = clamp(0, max_x + 4, g->width - 1);
+//                
+//            uint32_t * __restrict   screen = ((PgBitmapCanvas*)g)->data + scan_y * g->width;
+//            __m128i fg = _mm_set_epi32(color, color, color, color);
+//            for (int i = min_x; i < max_x; i += 4) {
+//                __m128i a = _mm_setr_epi32(buffer[i], buffer[i+1], buffer[i+2], buffer[i+3]);
+//                __m128i na = _mm_sub_epi32(_mm_set1_epi32(255), a);
+//                __m128i bg = _mm_load_si128((__m128i*)(screen + i));
+//                
+//                __m128i rb_fg = _mm_and_si128(fg, _mm_set1_epi32(0x00ff00ff));
+//                __m128i rb_bg = _mm_and_si128(bg, _mm_set1_epi32(0x00ff00ff));
+//                __m128i  g_fg = _mm_and_si128(fg, _mm_set1_epi32(0x0000ff00));
+//                __m128i  g_bg = _mm_and_si128(bg, _mm_set1_epi32(0x0000ff00));
+//                
+//                rb_fg = _mm_or_si128(
+//                            _mm_mul_epu32(rb_fg, a),
+//                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(rb_fg, 4), _mm_srli_si128(a, 4)), 4));
+//                rb_bg = _mm_or_si128(
+//                            _mm_mul_epu32(rb_bg, na),
+//                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(rb_bg, 4), _mm_srli_si128(na, 4)), 4));
+//                __m128i rb = _mm_and_si128(_mm_add_epi32(rb_bg, rb_fg), _mm_set1_epi32(0xff00ff00));
+//                
+//                g_fg = _mm_or_si128(
+//                            _mm_mul_epu32(g_fg, a),
+//                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(g_fg, 4), _mm_srli_si128(a, 4)), 4));
+//                g_bg = _mm_or_si128(
+//                            _mm_mul_epu32(g_bg, na),
+//                            _mm_slli_si128(_mm_mul_epu32(_mm_srli_si128(g_bg, 4), _mm_srli_si128(na, 4)), 4));
+//                __m128i g = _mm_and_si128(_mm_add_epi32(g_bg, g_fg), _mm_set1_epi32(0x00ff0000));
+//                
+//                *(__m128i*)(screen + i) = _mm_srli_epi32(_mm_or_si128(rb, g), 8);
+//            }
+//        } else
+        {
             uint32_t * __restrict   screen = ((PgBitmapCanvas*)g)->data + scan_y * g->width;
             for (int i = min_x; i <= max_x; i++)
                 if (buffer[i]) screen[i] = pgBlend(screen[i], color, buffer[i]);
