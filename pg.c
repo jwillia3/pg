@@ -14,20 +14,22 @@
 #include <pg/platform.h>
 #include "common.h"
 
-#define Gamma 2.2f
+static float GammaTable[256];
+void pgSetGamma(float gamma) {
+    PgGamma = gamma;
+    for (float i = 0; i < 256.0f; i++)
+        GammaTable[(int)i] = powf(i, PgGamma);
+}
+
 uint32_t pgBlend(uint32_t bg, uint32_t fg, uint32_t a255) {
     if (a255 == 255) return fg;
     if (a255 == 0) return bg;
-    static float enc[256];
-    if (!enc[1]) {
-        for (float i = 0; i < 256.0f; i++)
-            enc[(int)i] = powf(i, Gamma);
-    }
+    if (!PgGamma) pgSetGamma(2.2f);
     float a = a255 / 255.0f;
     float na = 1.0f - a;
-    uint8_t r = powf(a * enc[fg >> 16 & 255] + na * enc[bg >> 16 & 255], 1.0f / Gamma);
-    uint8_t g = powf(a * enc[fg >>  8 & 255] + na * enc[bg >>  8 & 255], 1.0f / Gamma);
-    uint8_t b = powf(a * enc[fg >>  0 & 255] + na * enc[bg >>  0 & 255], 1.0f / Gamma);
+    uint8_t r = powf(a * GammaTable[fg >> 16 & 255] + na * GammaTable[bg >> 16 & 255], 1.0f / PgGamma);
+    uint8_t g = powf(a * GammaTable[fg >>  8 & 255] + na * GammaTable[bg >>  8 & 255], 1.0f / PgGamma);
+    uint8_t b = powf(a * GammaTable[fg >>  0 & 255] + na * GammaTable[bg >>  0 & 255], 1.0f / PgGamma);
     return (r << 16) + (g << 8) + b;
 }
 
