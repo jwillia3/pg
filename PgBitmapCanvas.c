@@ -308,12 +308,27 @@ static void _clear(const Pg *g, uint32_t color) {
     while (p < end) *p++ = color;
 }
 
+static void _clearSection(const Pg *_g, PgRect rect, uint32_t color) {
+    PgBitmapCanvas *g = (PgBitmapCanvas*)_g;
+    int x1 = clamp(0, rect.a.x, g->_.width);
+    int x2 = clamp(0, ceil(rect.b.x), g->_.width);
+    int y1 = clamp(0, rect.a.y, g->_.height);
+    int y2 = clamp(0, ceil(rect.b.y), g->_.height);
+    
+    int stride = g->_.width;
+    uint32_t *p = g->data + y1 * stride;
+    for (int y = y1; y < y2; y++, p += stride)
+        for (int x = x1; x < x2; x++)
+            p[x] = color;
+}
+
 PgBitmapCanvas pgDefaultBitmapCanvas() {
     PgBitmapCanvas g;
     g._ = pgDefaultCanvas();
     g._.free = _free;
     g._.resize = _resize;
     g._.clear = _clear;
+    g._.clearSection = _clearSection;
     g._.fill = _fill;
     g._.fillChar = _fillChar;
     g._.fillGlyph = _fillGlyph;

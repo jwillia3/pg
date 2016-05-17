@@ -43,6 +43,7 @@ Pg pgDefaultCanvas() {
         .ctm = { 1, 0, 0, 1, 0, 0 },
         .free = (void*)_ignore,
         .clear = (void*)_ignore,
+        .clearSection = (void*)_ignore,
         .fill = (void*)_ignore,
         .fillChar = (void*)_ignoreF,
         .fillGlyph = (void*)_ignoreF,

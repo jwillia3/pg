@@ -15,6 +15,7 @@ struct Pg {
     void        (*free)(Pg *g);
     void        (*resize)(Pg *g, int width, int height);
     void        (*clear)(const Pg *g, uint32_t color);
+    void        (*clearSection)(const Pg *g, PgRect rect, uint32_t color);
     void        (*fill)(const Pg *g, const PgPath *path, uint32_t color);
     float       (*fillChar)(Pg *g, const PgFont *font, PgPt at, unsigned c, uint32_t color);
     float       (*fillUtf8)(Pg *g, const PgFont *font, PgPt at, const uint8_t chars[], int len, uint32_t color);
